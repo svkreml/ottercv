@@ -12,7 +12,7 @@
             <outputFileNameMapping>${artifact.build.finalName}.${artifact.extension}</outputFileNameMapping>
             <useProjectArtifact>false</useProjectArtifact>
             <includes>
-                <include>acme:multiplatform-distribution-client</include>
+                <include>svkreml:multiplatform-distribution-client</include>
             </includes>
         </dependencySet>
         <dependencySet>
@@ -20,7 +20,7 @@
             <outputDirectory>${app.dependencyDirectory}</outputDirectory>
             <useProjectArtifact>false</useProjectArtifact>
             <excludes>
-                <exclude>acme:multiplatform-distribution-client</exclude>
+                <exclude>svkreml:multiplatform-distribution-client</exclude>
             </excludes>
         </dependencySet>
     </dependencySets>
