@@ -238,8 +238,6 @@ public class CertificateParser {
             verificationDetails = new ArrayList<>();
             Set<X509Certificate> gostTlsStore = null;
             try {
-                gostTlsStore = new HashSet<>();
-
                 gostTlsStore = TrustChainBuilder.smallInit(localization, x509CertificateHolder);
                 //  gostTlsStore = TrustChainBuilder.gostTlsStore();
             } catch (Exception e) {
@@ -249,6 +247,8 @@ public class CertificateParser {
             }
             certificateChains = new ArrayList<>();
             Map<ASN1ObjectIdentifier, String> subject = x500NameToMap(x509CertificateHolder.getSubject());
+
+
             if (!gostTlsStore.isEmpty()) {
                 CertificateVerifier certificateVerifier = new CertificateVerifier(gostTlsStore);
                 certificateStatus = getCertificateStatus(x509CertificateHolder, verificationDetails, certificateVerifier);

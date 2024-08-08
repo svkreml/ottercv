@@ -33,6 +33,7 @@ import java.security.NoSuchProviderException;
 import java.security.Security;
 import java.security.cert.CertificateException;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 
 
@@ -102,7 +103,7 @@ public class APP extends Application {
             Platform.runLater(() -> {
                 certificateModel.getCertificateGeneralInfo().getCertificateStatus().setValue(certificateStatus);
                 certificateModel.getCertificateGeneralInfo().getStatusDetails().setValue(verificationDetails);
-                certificateModel.getCertificateChain().setValue(certificateChains);
+                certificateModel.getCertificateChain().setValue(new ArrayList<>(new LinkedHashSet<>(certificateChains)));
 
             });
         } catch (CertificateException | NoSuchAlgorithmException | NoSuchProviderException | InvalidAlgorithmParameterException | IOException e) {

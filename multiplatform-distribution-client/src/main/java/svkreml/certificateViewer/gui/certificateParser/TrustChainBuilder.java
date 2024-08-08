@@ -1,29 +1,27 @@
 package svkreml.certificateViewer.gui.certificateParser;
 
 
-
-import svkreml.tsl.tsl.ACA;
-import svkreml.tsl.tsl.CertData;
+import jakarta.xml.bind.JAXBContext;
+import jakarta.xml.bind.JAXBException;
+import jakarta.xml.bind.Unmarshaller;
+import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.asn1.x509.AuthorityKeyIdentifier;
 import org.bouncycastle.asn1.x509.Extension;
 import org.bouncycastle.asn1.x509.SubjectKeyIdentifier;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.util.encoders.Hex;
 import svkreml.certificateViewer.gui.localization.ru.Localization;
+import svkreml.tsl.tsl.ACA;
+import svkreml.tsl.tsl.CertData;
 
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
-import jakarta.xml.bind.JAXBContext;
-import jakarta.xml.bind.JAXBException;
-import jakarta.xml.bind.Unmarshaller;
 import java.io.*;
 import java.net.URL;
 import java.security.*;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.util.*;
-
-import static svkreml.certificateViewer.gui.certificateParser.CertificateParser.getThumbprintSha1;
 
 public class TrustChainBuilder {
 
@@ -47,12 +45,23 @@ public class TrustChainBuilder {
         LinkedHashSet<X509Certificate> set = new LinkedHashSet<>();
         KeyStore trusted = getKeyStore(localization);
         final byte[] authKeyIdentifier2 = getAuthKeyIdentifier(x509Certificate);
-        if(authKeyIdentifier2 ==null){
+        if (authKeyIdentifier2 == null) {
+            final byte[] subKeyIdentifier = getSubKeyIdentifier(x509Certificate);
+            if (subKeyIdentifier != null) {
+                java.security.cert.Certificate certificate = trusted.getCertificate(
+                        CustomBCStyle.INSTANCE.toString(X500Name.getInstance(x509Certificate.getIssuerX500Principal().getEncoded()))
+                                + " " + Hex.toHexString((Objects.requireNonNull(subKeyIdentifier))));
+                if (certificate == null) return set;
+                X509Certificate chainCert = KeyParser.loadCertificate(certificate.getEncoded());
+                if (chainCert == null) return set;
+                set.add(chainCert);
+            }
             return set;
         }
         String authKeyIdentifier = Hex.toHexString((Objects.requireNonNull(authKeyIdentifier2)));
         while (true) {
-            java.security.cert.Certificate certificate = trusted.getCertificate(authKeyIdentifier);
+            java.security.cert.Certificate certificate = trusted.getCertificate(CustomBCStyle.INSTANCE.toString(X500Name.getInstance(x509Certificate.getIssuerX500Principal().getEncoded()))
+                    + " " +authKeyIdentifier);
             if (certificate == null) break;
             X509Certificate chainCert = KeyParser.loadCertificate(certificate.getEncoded());
             if (chainCert == null) break;
@@ -69,20 +78,6 @@ public class TrustChainBuilder {
     }
 
 
-    public static void main(String[] args) throws Exception {
-        Localization localization = new Localization();
-        System.out.println("Качаем TSL " + localization.TSL_LOCATION);
-        Set<X509Certificate> list = gostTlsStore(localization);
-        for (X509Certificate x509Certificate : list) {
-            byte[] encoded = x509Certificate.getEncoded();
-            File file = new File("/opt/wildfly/stores/TrustStoreFolder/"+ getThumbprintSha1(encoded)+".cer");
-            FileOutputStream fos = new FileOutputStream(file);
-            fos.write(encoded);
-            fos.flush();
-            fos.close();
-        }
-
-    }
     private static KeyStore getKeyStore(Localization localization) throws KeyStoreException, NoSuchProviderException, IOException, NoSuchAlgorithmException, CertificateException, UnrecoverableEntryException, JAXBException {
         KeyStore trusted = KeyStore.getInstance("BKS", "BC");
         String tsl_location_bks = localization.TSL_LOCATION_BKS;
@@ -119,7 +114,9 @@ public class TrustChainBuilder {
 
         trusted1.load(null, "cgvybtunm,ovgcfre".toCharArray());
         for (X509Certificate x509Certificate : list) {
-            trusted1.setCertificateEntry(Hex.toHexString(Objects.requireNonNull(getSubjectKeyIdentifier(x509Certificate))), x509Certificate);
+            trusted1.setCertificateEntry(CustomBCStyle.INSTANCE.toString(X500Name.getInstance(x509Certificate.getIssuerX500Principal().getEncoded()))
+                    + " "
+                    + Hex.toHexString(Objects.requireNonNull(getSubjectKeyIdentifier(x509Certificate))), x509Certificate);
         }
         byte[] keyBytes = ("" + new Date().getTime()).getBytes();
         SecretKey a = new SecretKeySpec(keyBytes, "AES");
@@ -153,16 +150,6 @@ public class TrustChainBuilder {
         }
     }
 
-    public static File getDefaultCaCertificatesLocation() {
-        String javaInstallDir = System.getProperty("java.home");
-        String fileSep = System.getProperty("file.separator");
-        File cacertsFile = new File(javaInstallDir, "lib" + fileSep + "security" + fileSep + "cacerts");
-        try {
-            return cacertsFile.getCanonicalFile();
-        } catch (IOException e) {
-            return cacertsFile;
-        }
-    }
 
     private static byte[] getSubjectKeyIdentifier(X509Certificate certificate) {
         try {
@@ -182,6 +169,20 @@ public class TrustChainBuilder {
                 return AuthorityKeyIdentifier.getInstance(Arrays.copyOfRange(value, 2, value.length)).getKeyIdentifier();
             else
                 return AuthorityKeyIdentifier.getInstance(Arrays.copyOfRange(value, 4, value.length)).getKeyIdentifier();
+        } catch (Exception e) {
+            return null;
+        }
+        //return AuthorityKeyIdentifier.fromExtensions(new X509CertificateHolder(certificate.getEncoded()).getExtensions()).getKeyIdentifier();
+    }
+
+    private static byte[] getSubKeyIdentifier(X509Certificate certificate) {
+        try {
+            // ASN1OctetString.getInstance(new DEROctetString(certificate.getExtensionValue("2.5.29.35")));
+            byte[] value = certificate.getExtensionValue("2.5.29.14");
+            if (value.length < 28)
+                return SubjectKeyIdentifier.getInstance(Arrays.copyOfRange(value, 2, value.length)).getKeyIdentifier();
+            else
+                return SubjectKeyIdentifier.getInstance(Arrays.copyOfRange(value, 4, value.length)).getKeyIdentifier();
         } catch (Exception e) {
             return null;
         }

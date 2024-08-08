@@ -38,7 +38,7 @@ public class CertificateVerifier {
 
     public static boolean isSelfSigned(X509Certificate cert) throws CertificateException, NoSuchAlgorithmException, NoSuchProviderException {
         try {
-            if (!cert.getIssuerDN().equals(cert.getSubjectDN())) return false;
+            if (!cert.getIssuerX500Principal().equals(cert.getSubjectX500Principal())) return false;
             PublicKey key = cert.getPublicKey();
             cert.verify(key);
             return true;

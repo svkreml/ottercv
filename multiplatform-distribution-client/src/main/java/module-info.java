@@ -6,5 +6,6 @@ module svkreml.certificateViewer {
     requires java.naming;
     requires jakarta.xml.bind;
     opens svkreml.certificateViewer.gui.api.model;
+    opens svkreml.tsl.tsl;
     exports svkreml.certificateViewer.gui;
 }

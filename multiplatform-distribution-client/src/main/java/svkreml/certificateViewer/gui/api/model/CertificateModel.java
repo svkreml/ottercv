@@ -7,6 +7,7 @@ import org.bouncycastle.cert.X509CertificateHolder;
 
 import java.util.Date;
 import java.util.List;
+import java.util.Objects;
 
 public class CertificateModel {
 
@@ -19,11 +20,6 @@ public class CertificateModel {
         this.certificateDetails = certificateDetails;
     }
 
-    public CertificateModel(CertificateGeneralInfo certificateGeneralInfo, List<CertificateDetail> certificateDetails, Property<List<CertificateChain>> certificateChain) {
-        this.certificateGeneralInfo = certificateGeneralInfo;
-        this.certificateDetails = certificateDetails;
-        this.certificateChain = certificateChain;
-    }
 
     public CertificateGeneralInfo getCertificateGeneralInfo() {
         return this.certificateGeneralInfo;
@@ -214,6 +210,19 @@ public class CertificateModel {
 
 
     public static class CertificateChain {
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            CertificateChain that = (CertificateChain) o;
+            return Objects.equals(getCn(), that.getCn()) && getCertificateStatus() == that.getCertificateStatus() && Objects.equals(getX509CertificateHolder(), that.getX509CertificateHolder()) && Objects.equals(getList(), that.getList());
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(getCn(), getCertificateStatus(), getX509CertificateHolder(), getList());
+        }
+
         public String cn;
         public CertificateStatus certificateStatus;
         public X509CertificateHolder x509CertificateHolder;
