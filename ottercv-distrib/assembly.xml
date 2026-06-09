@@ -29,11 +29,10 @@
             <directory>./</directory>
             <outputDirectory>./</outputDirectory>
             <filtered>true</filtered>
-            <includes>
-                <include>ottercv.bat</include>
-                <include>ottercv.sh</include>
-                <include>license.txt</include>
-            </includes>
+               <includes>
+                    <include>ottercv.sh</include>
+                    <include>license.txt</include>
+                </includes>
         </fileSet>
         <fileSet>
             <directory>./</directory>

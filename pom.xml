@@ -4,7 +4,7 @@
 
     <groupId>svkreml.ottercv</groupId>
     <artifactId>ottercv</artifactId>
-    <version>1.1.0-SNAPSHOT</version>
+    <version>1.1.1</version>
     <packaging>pom</packaging>
     <name>Otter Certificate Viewer</name>
     <organization>
@@ -14,7 +14,7 @@
     <properties>
         <app.fullName>Otter Certificate Viewer</app.fullName>
         <app.shortName>OtterCV</app.shortName>
-        <app.copyrightYears>2024</app.copyrightYears>
+        <app.copyrightYears>2026</app.copyrightYears>
         <app.finalName>ottercv</app.finalName>
         <app.defaultPackage>svkreml.certificateViewer.gui</app.defaultPackage>
         <app.mainClass>${app.defaultPackage}.APP</app.mainClass>

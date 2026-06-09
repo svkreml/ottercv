@@ -13,6 +13,8 @@ import javafx.stage.Screen;
 import javafx.stage.Stage;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import svkreml.certificateViewer.gui.api.model.CertificateModel;
 import svkreml.certificateViewer.gui.api.model.CertificateStatus;
 import svkreml.certificateViewer.gui.certificateParser.CertificateParser;
@@ -24,6 +26,7 @@ import svkreml.certificateViewer.gui.view.utils.Alerts;
 import svkreml.certificateViewer.gui.view.utils.FxUtils;
 import svkreml.certificateViewer.gui.view.utils.Utils;
 
+import java.awt.event.ActionEvent;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -70,6 +73,7 @@ public class APP extends Application {
                     DgQWBBTCVPG0a9RMt+BtNrQjkPH+wzybBjAKBggqhQMHAQEDAgNBAJr6/eI7rHL7
                     +FsQnoH2i6DVxqalbIxLKj05edpZGPLLb6B2PTAMya7pSt9hb8QnFABgsR4IE5gT
                     4VVkDWbX/n4""";
+    private static final Logger log = LoggerFactory.getLogger(APP.class);
 
 /*   sudo apt purge openjfx
     sudo  apt install openjfx=8u242-b08-0ubuntu3 libopenjfx-jni=8u242-b08-0ubuntu3 libopenjfx-java=8u242-b08-0ubuntu3
@@ -79,6 +83,13 @@ public class APP extends Application {
     Localization localization;
 
     public static void main(String[] args) {
+        String aiTest = System.getenv("AI_TEST");
+        if ("true".equalsIgnoreCase(aiTest)) {
+            javax.swing.Timer timer = new javax.swing.Timer(3000, (ActionEvent e) -> System.exit(0));
+            timer.setRepeats(false);
+            timer.start();
+        }
+
         Security.addProvider(new BouncyCastleProvider());
         //  APP.args = args;
         launch(args);
@@ -90,8 +101,9 @@ public class APP extends Application {
             localization = Localization.init();
             AnchorPane rootPane = createStage(primaryStage);
             Platform.runLater(() -> populateStage(rootPane));
-        } catch (Throwable e) {
+        } catch (Exception e) {
             Alerts.showStackTraceAlert(e);
+            log.error(e.getMessage(), e);
         }
     }
 

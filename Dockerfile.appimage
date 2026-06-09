@@ -1,0 +1,39 @@
+FROM ubuntu:20.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV LANG=C.UTF-8
+ENV LC_ALL=C.UTF-8
+
+RUN apt-get update && apt-get install -y \
+    openjdk-21-jdk \
+    maven \
+    curl \
+    wget \
+    unzip \
+    zip \
+    xvfb \
+    libgtk-3-0 \
+    libxext6 \
+    libxrender1 \
+    libxtst6 \
+    libxi6 \
+    libxrandr2 \
+    libasound2 \
+    libnss3 \
+    libglib2.0-0 \
+    libdrm2 \
+    libgbm1 \
+    libxcomposite1 \
+    libxcursor1 \
+    libxdamage1 \
+    libxinerama1 \
+    libxss1 \
+    libfuse2 \
+    ca-certificates \
+    binutils \
+    && rm -rf /var/lib/apt/lists/*
+
+ENV JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64
+ENV PATH=$JAVA_HOME/bin:$PATH
+
+WORKDIR /build

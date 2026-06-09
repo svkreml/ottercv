@@ -20,7 +20,7 @@ public class Localization {
     public String TSL_LOCATION_BKS = DEFAULT_PATH + "/tsl.bks";
     public String PROGRAM_TITLE = "Certificate";
     public String TAB_GENERAL_TITLE = "General";
-    public String TAB_CHAIN_TITLE = "General";
+    public String TAB_CHAIN_TITLE = "Chain";
     public String BUTTON_OK = "   OK   ";
     public String CERT_STATUS_TRUSTED = "Сертификат действителен";
     public String CERT_STATUS_UNTRUSTED_ROOT = "Корневой сертификат данной цепочки не в списке доверенных";
