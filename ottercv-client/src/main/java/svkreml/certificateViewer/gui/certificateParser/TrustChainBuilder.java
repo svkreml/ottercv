@@ -17,6 +17,7 @@ import svkreml.tsl.tsl.CertData;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 import java.io.*;
+import java.nio.file.Files;
 import java.net.URL;
 import java.security.*;
 import java.security.cert.CertificateException;
@@ -84,6 +85,7 @@ public class TrustChainBuilder {
         File file = new File(tsl_location_bks);
         if (file.exists()) {
             trusted.load(new FileInputStream(tsl_location_bks), "cgvybtunm,ovgcfre".toCharArray());
+            addRootCertsFromCaFolder(trusted, tsl_location_bks);
 
             Date createDate = new Date(Long.parseLong(
                     new String(((KeyStore.SecretKeyEntry) trusted.getEntry("info", new KeyStore.PasswordProtection("creation date".toCharArray()))).getSecretKey().getEncoded()))
@@ -118,6 +120,7 @@ public class TrustChainBuilder {
                     + " "
                     + Hex.toHexString(Objects.requireNonNull(getSubjectKeyIdentifier(x509Certificate))), x509Certificate);
         }
+        addRootCertsFromCaFolder(trusted1, localization.TSL_LOCATION_BKS);
         byte[] keyBytes = ("" + new Date().getTime()).getBytes();
         SecretKey a = new SecretKeySpec(keyBytes, "AES");
         Set<KeyStore.Entry.Attribute> b = new HashSet<>();
@@ -150,6 +153,34 @@ public class TrustChainBuilder {
         }
     }
 
+
+    private static void addRootCertsFromCaFolder(KeyStore keyStore, String bksFilePath) {
+        File caDir = new File(new File(bksFilePath).getParentFile(), "ca");
+        if (!caDir.exists() || !caDir.isDirectory()) {
+            return;
+        }
+        File[] files = caDir.listFiles();
+        if (files == null) {
+            return;
+        }
+        for (File file : files) {
+            if (!file.isFile()) continue;
+            try {
+                X509Certificate cert = KeyParser.loadCertificate(Files.readAllBytes(file.toPath()));
+                byte[] ski = getSubjectKeyIdentifier(cert);
+                if (ski == null) {
+                    System.out.println("Skipping certificate " + file.getName() + ": no Subject Key Identifier");
+                    continue;
+                }
+                String alias = CustomBCStyle.INSTANCE.toString(X500Name.getInstance(cert.getIssuerX500Principal().getEncoded()))
+                        + " " + Hex.toHexString(ski);
+                keyStore.setCertificateEntry(alias, cert);
+                System.out.println("Added root certificate from " + file.getName());
+            } catch (Exception e) {
+                System.out.println("Failed to load certificate from " + file.getName() + ": " + e.getMessage());
+            }
+        }
+    }
 
     private static byte[] getSubjectKeyIdentifier(X509Certificate certificate) {
         try {

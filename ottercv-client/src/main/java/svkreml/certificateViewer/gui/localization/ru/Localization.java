@@ -15,7 +15,7 @@ public class Localization {
 
 
 
-    public static String DEFAULT_PATH = System.getProperty("user.home")+"/ottercv";
+    public static String DEFAULT_PATH = System.getProperty("user.home")+"/.ottercv";
     public String TSL_LOCATION = "https://e-trust.gosuslugi.ru/CA/DownloadTSL?schemaVersion=0";
     public String TSL_LOCATION_BKS = DEFAULT_PATH + "/tsl.bks";
     public String PROGRAM_TITLE = "Certificate";
@@ -28,16 +28,15 @@ public class Localization {
     public String CERT_STATUS_BROKEN = "Подпись сертификата или сам сертификат невалиден";
     public String CERT_STATUS_OVERDUE = "Срок действия сертификата истёк или не наступил";
     public String CERT_STATUS_UNKNOWN = "Состояние сертификата не проверялось";
-    public String TAB_GENERAL_LABEL_CERTIFICATE_INFORMATION = "Certificate Information:";
-    public String TAB_GENERAL_VALID_FROM = "Valid from ";
-    public String TAB_GENERAL_VALID_TO = " to ";
-    public String TAB_GENERAL_ISSUED_BY = "Issued to:";
-    public String TAB_GENERAL_ISSUED_TO = "Issued by:";
-    public String TAB_GENERAL_LABEL_CERT_PURPOSE = "This certificate is intended for the following purpose(s):";
+    public String TAB_GENERAL_LABEL_CERTIFICATE_INFORMATION = "Сведения о сертификате:";
+    public String TAB_GENERAL_VALID_FROM = "Действителен с ";
+    public String TAB_GENERAL_VALID_TO = " по ";
+    public String TAB_GENERAL_ISSUED_BY = "Субъект:";
+    public String TAB_GENERAL_ISSUED_TO = "Издатель:";
 
-    public String TAB_DETAILS_TITLE = "Details";
-    public String TAB_DETAILS_LABEL_CERTIFICATION_PATH = "Certification path";
-    public String TAB_DETAILS_LABEL_SHOW = "Show:";
+    public String TAB_DETAILS_TITLE = "Подробности";
+    public String TAB_DETAILS_LABEL_CERTIFICATION_PATH = "Цепочка сертификатов:";
+    public String TAB_DETAILS_LABEL_SHOW = "Показать:";
     public String TAB_DETAIL_TABLE_KEY_VERSION = "Версия";
     public String TAB_DETAIL_TABLE_KEY_SERIAL_NUMBER = "Серийный номер";
     public String TAB_DETAIL_TABLE_KEY_ALG = "Алгоритм подписи";
@@ -55,12 +54,7 @@ public class Localization {
     public Map<ASN1ObjectIdentifier, String> oidMap = new HashMap<>();
 
 
-    public String DATE_FORMAT = "dd/MM/yyyy HH:mm:ss";
-    public String VERSION = "1.0";
-    public String PROGRAM = "svkreml.Localization";
-    public String ABOUT = "abstract LocalizationBase";
-    public String COMMENT = "default class";
-    public String LANGUAGE = "DEFAULT";
+    public String DATE_FORMAT = "dd.MM.yyyy HH:mm:ss";
     public String TAB_DETAIL_TABLE_KEY_PUBLIC_KEY_ALG = "Алгоритм:";
     public String EXTENSIONS_PATH_LEN_CONSTRAINT= "PathLenConstraint:";
     public String EXTENSIONS_IS_CA = "isCa:";
@@ -990,9 +984,6 @@ public class Localization {
         return localization;
     }
 
-    public static void main(String[] args) throws IOException {
-
-    }
 
     public String convertOidToString(ASN1ObjectIdentifier asn1) {
         return oidMap.getOrDefault(asn1, asn1.getId());
@@ -1003,21 +994,14 @@ public class Localization {
     }
 
     public String nameCertificateStatus(CertificateStatus certificateStatus) {
-        switch (certificateStatus) {
-            case TRUSTED:
-                return CERT_STATUS_TRUSTED;
-            case UNTRUSTED_ROOT:
-                return CERT_STATUS_UNTRUSTED_ROOT;
-            case UNTRUSTED_CHAIN:
-                return CERT_STATUS_UNTRUSTED_CHAIN;
-            case BROKEN:
-                return CERT_STATUS_BROKEN;
-            case OVERDUE:
-                return CERT_STATUS_OVERDUE;
-            case UNKNOWN:
-                return CERT_STATUS_UNKNOWN;
-        }
-        throw new RuntimeException("WTF");
+        return switch (certificateStatus) {
+            case TRUSTED -> CERT_STATUS_TRUSTED;
+            case UNTRUSTED_ROOT -> CERT_STATUS_UNTRUSTED_ROOT;
+            case UNTRUSTED_CHAIN -> CERT_STATUS_UNTRUSTED_CHAIN;
+            case BROKEN -> CERT_STATUS_BROKEN;
+            case OVERDUE -> CERT_STATUS_OVERDUE;
+            case UNKNOWN -> CERT_STATUS_UNKNOWN;
+        };
     }
 
     public String formatDate(Date date) {
