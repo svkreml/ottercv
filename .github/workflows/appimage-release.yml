@@ -1,0 +1,31 @@
+name: Build AppImage Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-appimage:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build -t ottercv-appimage-builder -f Dockerfile.appimage .
+
+      - name: Build AppImage
+        run: |
+          docker run --rm \
+            -v "${{ github.workspace }}:/build" \
+            -e "HOME=/build" \
+            --user "$(id -u):$(id -g)" \
+            ottercv-appimage-builder \
+            bash -c "cd /build && mvn clean package -P linux-appimage -q"
+
+      - name: Upload AppImage to Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: ottercv-client/target/*.AppImage
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
