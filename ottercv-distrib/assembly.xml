@@ -12,7 +12,7 @@
             <outputFileNameMapping>${artifact.build.finalName}.${artifact.extension}</outputFileNameMapping>
             <useProjectArtifact>false</useProjectArtifact>
             <includes>
-                <include>svkreml:multiplatform-distribution-client</include>
+                <include>svkreml:ottercv-client</include>
             </includes>
         </dependencySet>
         <dependencySet>
@@ -20,7 +20,7 @@
             <outputDirectory>${app.dependencyDirectory}</outputDirectory>
             <useProjectArtifact>false</useProjectArtifact>
             <excludes>
-                <exclude>svkreml:multiplatform-distribution-client</exclude>
+                <exclude>svkreml:ottercv-client</exclude>
             </excludes>
         </dependencySet>
     </dependencySets>
@@ -30,8 +30,8 @@
             <outputDirectory>./</outputDirectory>
             <filtered>true</filtered>
             <includes>
-                <include>multiplatform-distribution.bat</include>
-                <include>multiplatform-distribution.sh</include>
+                <include>ottercv.bat</include>
+                <include>ottercv.sh</include>
                 <include>license.txt</include>
             </includes>
         </fileSet>

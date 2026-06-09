@@ -38,8 +38,8 @@
     </properties>
 
     <modules>
-        <module>multiplatform-distribution-client</module>
-        <module>multiplatform-distribution-distrib</module>
+        <module>ottercv-client</module>
+        <module>ottercv-distrib</module>
     </modules>
 
     <build>

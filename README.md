@@ -1,44 +1,27 @@
-# Multi platform distribution for Java application
+# OtterCV - Otter Certificate Viewer
 
-The example demonstrates how to create multi platform distributions for applications in *Java 21*.
+A JavaFX desktop application for viewing and analyzing X.509 certificates.
 
 ## Requirements
 
 * [JDK 21+](https://www.oracle.com/java/technologies/downloads/)
 * [Apache Maven 3.9.0+](https://maven.apache.org/download.cgi)
-* [Inno Setup 6.2.2+](https://jrsoftware.org/isinfo.php)
+* [Inno Setup 6.2.2+](https://jrsoftware.org/isinfo.php) (for Windows native installer)
 
-## Compilation and package creation
+## Building
 
 With native packages:
 
     mvn clean package -P native-deploy
-    
-Without native packages (only *ZIP* file):
+
+Without native packages (ZIP only):
 
     mvn clean package
-    
-## Location of package files
 
-For all platforms:
+## Output
 
-    multiplatform-distribution-distrib/target/multiplatform-distribution-<version>-no-jre.zip
+Cross-platform ZIP (no JRE):
 
-For *Windows*:
+    ottercv-distrib/target/ottercv-<version>-no-jre.zip
 
-    multiplatform-distribution-client/target/multiplatform-distribution-<version>.exe
-
-For *macOS*:
-
-    multiplatform-distribution-client/target/multiplatform-distribution-<version>.dmg
-
-For *Linux*:
-
-    multiplatform-distribution-client/target/multiplatform-distribution-<version>.tar.gz
-    multiplatform-distribution-client/target/multiplatform-distribution_<version>.deb
-    multiplatform-distribution-client/target/multiplatform-distribution_<version>.rpm
-
-## Articles
-
-* [Creating distributions for different operating systems in Java 21 and 22](https://habr.com/ru/companies/jugru/articles/816981/) (Russian)
-* [Creating distributions for different operating systems in Java 9 and 10](https://habr.com/ru/companies/jugru/articles/340248/) (Russian)
+Native installers are generated in `ottercv-client/target/`.

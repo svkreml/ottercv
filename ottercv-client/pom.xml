@@ -10,9 +10,10 @@
         <version>1.1.0-SNAPSHOT</version>
     </parent>
 
-    <artifactId>multiplatform-distribution-client</artifactId>
+    <artifactId>ottercv-client</artifactId>
     <packaging>jar</packaging>
-    <name>Multiplatform Distribution Client</name>
+    <name>OtterCV Client</name>
+    <description>Core application module for Otter Certificate Viewer</description>
 
     <build>
         <finalName>${app.finalName}-${project.version}</finalName>
@@ -77,9 +78,14 @@
                     </archive>
                 </configuration>
             </plugin>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-resources-plugin</artifactId>
+<plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-surefire-plugin</artifactId>
+                    <version>3.2.5</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-resources-plugin</artifactId>
                 <version>${maven-resources-plugin.version}</version>
                 <executions>
                     <execution>
@@ -93,7 +99,7 @@
                             <outputDirectory>${project.basedir}/target</outputDirectory>
                             <resources>
                                 <resource>
-                                    <directory>${project.basedir}/../multiplatform-distribution-distrib</directory>
+                                    <directory>${project.basedir}/../ottercv-distrib</directory>
                                     <filtering>true</filtering>
                                     <includes>
                                         <include>license.txt</include>
@@ -141,6 +147,20 @@
             <groupId>org.bouncycastle</groupId>
             <artifactId>bcpkix-jdk18on</artifactId>
             <version>1.77</version>
+        </dependency>
+
+        <!-- Test -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>5.10.2</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.assertj</groupId>
+            <artifactId>assertj-core</artifactId>
+            <version>3.26.0</version>
+            <scope>test</scope>
         </dependency>
 
         <!-- Logging -->
@@ -221,8 +241,8 @@
                                 </goals>
                                 <configuration>
                                     <additionalResources>
-                                        <additionalResource>${project.basedir}/../multiplatform-distribution-distrib/readme.txt</additionalResource>
-                                        <additionalResource>${project.basedir}/../multiplatform-distribution-distrib/ottercv.l4j.ini</additionalResource>
+                                        <additionalResource>${project.basedir}/../ottercv-distrib/readme.txt</additionalResource>
+                                        <additionalResource>${project.basedir}/../ottercv-distrib/ottercv.l4j.ini</additionalResource>
                                     </additionalResources>
                                     <assetsDir>${project.basedir}/assets</assetsDir>
                                     <bundleJre>true</bundleJre>
