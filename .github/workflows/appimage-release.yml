@@ -26,6 +26,6 @@ jobs:
       - name: Upload AppImage to Release
         uses: softprops/action-gh-release@v1
         with:
-          files: ottercv-client/target/*.AppImage
+          files: ottercv-client/target/ottercv-*.AppImage
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
