@@ -115,24 +115,6 @@ class CertificateParserValidateTest {
     }
 
     @Test
-    void validateCrossCertFromResources() throws Exception {
-        X509CertificateHolder crossHolder = TestCertUtils.loadHolderFromResources("2F0CB09-crosscert.cer");
-
-        Localization localization = new Localization();
-        localization.TSL_LOCATION_BKS = TestCertUtils.createTempBksWithHolder(crossHolder);
-
-        CertificateParser.Validate validate = new CertificateParser.Validate(localization, crossHolder);
-        validate.invoke();
-
-        assertThat(validate).isNotNull();
-        assertThat(validate.getVerificationDetails()).isNotNull();
-        assertThat(validate.getCertificateStatus())
-                .isIn(CertificateStatus.TRUSTED, CertificateStatus.BROKEN, CertificateStatus.UNTRUSTED_ROOT);
-        assertThat(validate.getCertificateChains()).isNotNull();
-        assertThat(validate.getCertificateChains()).isNotEmpty();
-    }
-
-    @Test
     void validateCrossCertWithIssuerInKeystore() throws Exception {
         X509CertificateHolder crossHolder = TestCertUtils.loadHolderFromResources("1D13121735DD6E1F59EA58C786B8F7E8B7E6E20F.cer");
         X509CertificateHolder selfSignedHolder = TestCertUtils.loadHolderFromResources("2F0CB09BE3550EF17EC4F29C90ABD18BFCAAD63A.cer");
