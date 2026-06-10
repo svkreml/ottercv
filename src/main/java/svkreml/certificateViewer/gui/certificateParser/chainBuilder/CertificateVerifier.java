@@ -16,7 +16,6 @@ public class CertificateVerifier {
     X509CertSelector selector = new X509CertSelector();
 
     public CertificateVerifier(Set<X509Certificate> additionalCerts) throws
-            CertificateException,
             NoSuchAlgorithmException,
             NoSuchProviderException,
             InvalidAlgorithmParameterException {
@@ -45,16 +44,27 @@ public class CertificateVerifier {
                 trustedRootCerts.size(), intermediateCerts.size(), (stop - start));
     }
 
-    public static boolean isSelfSigned(X509Certificate cert)
-            throws CertificateException, NoSuchAlgorithmException, NoSuchProviderException {
+    public static boolean isSelfSigned(X509Certificate cert) {
         try {
-            if (!cert.getIssuerX500Principal().equals(cert.getSubjectX500Principal())) return false;
-            PublicKey key = cert.getPublicKey();
-            cert.verify(key);
-            return true;
-        } catch (SignatureException | InvalidKeyException sigEx) {
+            if (!cert.getIssuerX500Principal().equals(cert.getSubjectX500Principal())) {
+                return false;
+            }
+        } catch (Exception e) {
+            log.debug("Error comparing principals for self-signed check: {}", e.getMessage());
             return false;
         }
+
+        try {
+            PublicKey key = cert.getPublicKey();
+            cert.verify(key);
+        } catch (SignatureException | InvalidKeyException e) {
+            log.debug("Invalid signature for self-signed check: {}", e.getMessage());
+            return false;
+        } catch (Exception e) {
+            log.debug("Technical error during signature verification for {}: {}",
+                    cert.getSubjectX500Principal(), e.getMessage());
+        }
+        return true;
     }
 
     private PKIXCertPathBuilderResult verifyCertificateP(X509Certificate cert) throws GeneralSecurityException {

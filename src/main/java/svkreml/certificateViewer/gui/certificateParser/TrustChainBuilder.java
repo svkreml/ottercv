@@ -5,7 +5,6 @@ import jakarta.xml.bind.JAXBContext;
 import jakarta.xml.bind.JAXBException;
 import jakarta.xml.bind.Unmarshaller;
 import lombok.extern.slf4j.Slf4j;
-import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.asn1.x509.AuthorityKeyIdentifier;
 import org.bouncycastle.asn1.x509.Extension;
 import org.bouncycastle.asn1.x509.SubjectKeyIdentifier;
@@ -79,107 +78,122 @@ public class TrustChainBuilder {
         KeyStore trusted = getKeyStore(localization);
         log.debug("smallInit for cert subject={}", x509Certificate.getSubjectX500Principal());
 
-        final byte[] authKeyIdentifierRaw = getAuthKeyIdentifier(x509Certificate);
-        final byte[] subKeyIdentifier = getSubKeyIdentifier(x509Certificate);
+        final byte[] akiRaw = getAuthKeyIdentifier(x509Certificate);
+        final byte[] skiRaw = getSubKeyIdentifier(x509Certificate);
         log.debug("Leaf cert AKI={}, SKI={}",
-                authKeyIdentifierRaw != null ? Hex.toHexString(authKeyIdentifierRaw) : "null",
-                subKeyIdentifier != null ? Hex.toHexString(subKeyIdentifier) : "null");
+                akiRaw != null ? Hex.toHexString(akiRaw) : "null",
+                skiRaw != null ? Hex.toHexString(skiRaw) : "null");
 
-        if (authKeyIdentifierRaw == null) {
-            if (subKeyIdentifier != null) {
-                String lookupAlias = Hex.toHexString(subKeyIdentifier);
-                log.debug("No AKI, looking up by subject+SKI: {}", lookupAlias);
-                java.security.cert.Certificate certificate = trusted.getCertificate(lookupAlias);
-                if (certificate == null) {
-                    log.debug("Not found in keystore by subject+SKI");
+        // AKI == null означает самоподписанный (корневой) сертификат — найти самого себя
+        if (akiRaw == null) {
+            if (skiRaw != null) {
+                X509Certificate self = pickOne(findAllCertificatesBySki(trusted, skiRaw), x509Certificate);
+                if (self != null) {
+                    set.add(self);
+                    log.debug("Self-signed cert found in keystore by SKI: subject={}", self.getSubjectX500Principal());
                 } else {
-                    X509Certificate chainCert = KeyParser.loadCertificate(certificate.getEncoded());
-                    if (chainCert == null) return set;
-                    set.add(chainCert);
-                    log.debug("Found chain cert: {}", chainCert.getSubjectX500Principal());
-                }
-            }
-            if (set.isEmpty()) {
-                log.debug("No AKI and no SKI match, searching trust store by issuer subject");
-                try {
-                    Enumeration<String> aliases = trusted.aliases();
-                    while (aliases.hasMoreElements()) {
-                        String alias = aliases.nextElement();
-                        java.security.cert.Certificate certificate = trusted.getCertificate(alias);
-                        if (certificate == null || !(certificate instanceof X509Certificate)) continue;
-                        X509Certificate candidate = (X509Certificate) certificate;
-                        if (candidate.getSubjectX500Principal().equals(x509Certificate.getIssuerX500Principal())) {
-                            log.debug("Found potential issuer by subject match: alias={}, subject={}", alias,
-                                    candidate.getSubjectX500Principal());
-                            set.add(candidate);
-                        }
-                    }
-                } catch (Exception e) {
-                    log.debug("Error searching trust store by issuer subject: {}", e.getMessage());
+                    log.debug("Self-signed cert NOT found in keystore by SKI={}", Hex.toHexString(skiRaw));
                 }
             }
             return set;
         }
 
-        String authKeyIdentifier = Hex.toHexString(authKeyIdentifierRaw);
+        // Поднимаемся вверх по цепочке: AKI текущего сертификата == SKI родителя
+        byte[] currentAki = akiRaw;
+        X509Certificate currentCert = x509Certificate;
         int hop = 0;
-        while (true) {
+
+        while (currentAki != null) {
             hop++;
-            String lookupAlias = authKeyIdentifier;
-            log.debug("Hop {}: looking up issuer by AKI={}, alias={}", hop, authKeyIdentifier, lookupAlias);
+            String lookupAlias = Hex.toHexString(currentAki);
+            log.debug("Hop {}: looking up parent by AKI/SKI={}", hop, lookupAlias);
 
-            java.security.cert.Certificate certificate = trusted.getCertificate(authKeyIdentifier);
-            if (certificate == null) {
-                certificate = findCertificateBySki(trusted, authKeyIdentifierRaw);
+            List<X509Certificate> parentCandidates = findAllCertificatesBySki(trusted, currentAki);
+            if (parentCandidates.isEmpty()) {
+                log.debug("Hop {}: parent not found in keystore, chain ends", hop);
+                break;
             }
-            if (certificate == null) {
-                log.debug("Hop {}: not found by AKI/SKI, searching trust store by issuer subject", hop);
-                try {
-                    Enumeration<String> aliases = trusted.aliases();
-                    while (aliases.hasMoreElements()) {
-                        String alias = aliases.nextElement();
-                        java.security.cert.Certificate cert = trusted.getCertificate(alias);
-                        if (cert == null || !(cert instanceof X509Certificate)) continue;
-                        X509Certificate candidate = (X509Certificate) cert;
-                        if (candidate.getSubjectX500Principal().equals(x509Certificate.getIssuerX500Principal())) {
-                            log.debug("Hop {}: found issuer by subject match: alias={}, subject={}", hop, alias,
-                                    candidate.getSubjectX500Principal());
-                            certificate = cert;
-                            break;
-                        }
+
+            X509Certificate parentCert = pickOne(parentCandidates, currentCert);
+            set.add(parentCert);
+            log.debug("Hop {}: picked parent: subject={}, selfSigned={}", hop,
+                    parentCert.getSubjectX500Principal(), isSelfSigned(parentCert));
+
+            // Проверяем, является ли найденный сертификат корневым (AKI == null)
+            byte[] parentAki = getAuthKeyIdentifier(parentCert);
+            if (parentAki == null) {
+                byte[] parentSki = getSubKeyIdentifier(parentCert);
+                if (parentSki != null) {
+                    X509Certificate root = pickOne(findAllCertificatesBySki(trusted, parentSki), parentCert);
+                    if (root != null) {
+                        set.add(root);
+                        log.debug("Hop {}: root cert added by SKI={}: subject={}", hop,
+                                Hex.toHexString(parentSki), root.getSubjectX500Principal());
+                    } else {
+                        log.debug("Hop {}: root cert NOT in keystore by SKI={}", hop, Hex.toHexString(parentSki));
                     }
-                } catch (Exception e) {
-                    log.debug("Hop {}: error searching by issuer subject: {}", hop, e.getMessage());
                 }
-            }
-            if (certificate == null) {
-                log.debug("Hop {}: issuer not found in keystore, chain ends", hop);
+                log.debug("Hop {}: reached root (self-signed), chain ends", hop);
                 break;
             }
-            X509Certificate chainCert = KeyParser.loadCertificate(certificate.getEncoded());
-            if (chainCert == null) {
-                log.debug("Hop {}: failed to parse issuer cert", hop);
-                break;
-            }
-            set.add(chainCert);
-            log.debug("Hop {}: found issuer: subject={}", hop, chainCert.getSubjectX500Principal());
 
-            byte[] authKeyIdentifier1 = getAuthKeyIdentifier(chainCert);
-            if (authKeyIdentifier1 == null) {
-                log.debug("Hop {}: issuer has no AKI, chain ends", hop);
-                break;
-            }
-            String nextAki = Hex.toHexString(authKeyIdentifier1);
-            log.debug("Hop {}: issuer AKI={}", hop, nextAki);
-            if (nextAki.equals(authKeyIdentifier)) {
+            // Защита от зацикливания
+            String nextAkiHex = Hex.toHexString(parentAki);
+            if (nextAkiHex.equals(lookupAlias)) {
                 log.debug("Hop {}: AKI loop detected, chain ends", hop);
                 break;
             }
-            authKeyIdentifier = nextAki;
-            x509Certificate = chainCert;
+
+            currentCert = parentCert;
+            currentAki = parentAki;
         }
+
         log.info("smallInit completed, chain size: {}", set.size());
         return set;
+    }
+
+    /**
+     * Выбрать ОДИН сертификат из кандидатов.
+     * <p>
+     * Логика:
+     * 1. Фильтруем по совпадению candidate.Subject == child.Issuer (Issuer подчинённого == Subject УЦ)
+     * 2. Если несколько — предпочитаем самоподписанный (самая короткая цепочка до trust anchor)
+     * 3. Если кандидатов нет — берём первый попавшийся (fallback)
+     */
+    private static X509Certificate pickOne(List<X509Certificate> candidates, X509Certificate childCert) {
+        if (candidates.isEmpty()) return null;
+        if (candidates.size() == 1) return candidates.get(0);
+
+        log.debug("pickOne: {} candidates with same SKI, disambiguating", candidates.size());
+
+        // 1. Фильтр: candidate.Subject == child.Issuer
+        List<X509Certificate> issuerMatch = candidates.stream()
+                .filter(c -> c.getSubjectX500Principal().equals(childCert.getIssuerX500Principal()))
+                .collect(Collectors.toList());
+
+        List<X509Certificate> pool;
+        if (!issuerMatch.isEmpty()) {
+            pool = issuerMatch;
+            log.debug("pickOne: {} candidates match child.Issuer", issuerMatch.size());
+        } else {
+            pool = candidates;
+            log.debug("pickOne: no Subject match, using all {} candidates", candidates.size());
+        }
+
+        // 2. Если несколько — предпочитаем самоподписанный (самая короткая цепочка)
+        if (pool.size() > 1) {
+            List<X509Certificate> selfSigned = pool.stream()
+                    .filter(TrustChainBuilder::isSelfSigned)
+                    .collect(Collectors.toList());
+            if (!selfSigned.isEmpty()) {
+                log.debug("pickOne: preferring self-signed ({} of {})", selfSigned.size(), pool.size());
+                pool = selfSigned;
+            }
+        }
+
+        X509Certificate chosen = pool.get(0);
+        log.debug("pickOne: chosen subject={}, selfSigned={}", chosen.getSubjectX500Principal(), isSelfSigned(chosen));
+        return chosen;
     }
 
     private static KeyStore getKeyStore(Localization localization) throws
@@ -247,7 +261,10 @@ public class TrustChainBuilder {
         trusted1.load(null, BKS_PASSWORD);
         int count = 0;
         for (X509Certificate x509Certificate : list) {
-            String alias = Hex.toHexString(Objects.requireNonNull(getSubjectKeyIdentifier(x509Certificate)));
+            String alias =
+                    x509Certificate.getSubjectX500Principal().getName() + "\t"
+                            + Hex.toHexString(Objects.requireNonNull(getSubjectKeyIdentifier(x509Certificate)))
+                            + "\t" + certFingerprint(x509Certificate);
             trusted1.setCertificateEntry(alias, x509Certificate);
             log.debug("Stored TSL cert #{}: alias={}, subject={}",
                     ++count,
@@ -312,11 +329,7 @@ public class TrustChainBuilder {
                     log.warn("Skipping CA certificate {}: no Subject Key Identifier", file.getName());
                     continue;
                 }
-                String
-                        alias =
-                        CustomBCStyle.INSTANCE.toString(X500Name.getInstance(cert.getSubjectX500Principal()
-                                .getEncoded()))
-                                + " " + Hex.toHexString(ski);
+                String alias = Hex.toHexString(ski) + "\t" + certFingerprint(cert);
                 keyStore.setCertificateEntry(alias, cert);
                 CA_FOLDER_CERTS.add(cert);
                 log.debug("Added root certificate from {}: subject={}, ski={}", file.getName(),
@@ -329,7 +342,8 @@ public class TrustChainBuilder {
         log.info("Added {} certificates from CA folder", added);
     }
 
-    private static java.security.cert.Certificate findCertificateBySki(KeyStore keyStore, byte[] skiToFind) {
+    private static List<X509Certificate> findAllCertificatesBySki(KeyStore keyStore, byte[] skiToFind) {
+        List<X509Certificate> result = new ArrayList<>();
         try {
             Enumeration<String> aliases = keyStore.aliases();
             while (aliases.hasMoreElements()) {
@@ -340,16 +354,16 @@ public class TrustChainBuilder {
                 if (ski != null && Arrays.equals(ski, skiToFind)) {
                     log.debug("Found cert by SKI match: alias={}, subject={}", alias,
                             ((X509Certificate) cert).getSubjectX500Principal());
-                    return cert;
+                    result.add((X509Certificate) cert);
                 }
             }
         } catch (Exception e) {
             log.debug("Error searching keystore by SKI: {}", e.getMessage());
         }
-        return null;
+        return result;
     }
 
-    private static byte[] getSubjectKeyIdentifier(X509Certificate certificate) {
+    public static byte[] getSubjectKeyIdentifier(X509Certificate certificate) {
         try {
             byte[] value = certificate.getExtensionValue(Extension.subjectKeyIdentifier.getId());
             return SubjectKeyIdentifier.getInstance(
@@ -382,5 +396,19 @@ public class TrustChainBuilder {
             return null;
         }
     }
+
+    private static String certFingerprint(X509Certificate cert) {
+        try {
+            return Hex.toHexString(MessageDigest.getInstance("SHA-256").digest(cert.getEncoded()));
+        } catch (Exception e) {
+            return "unknown-" + System.identityHashCode(cert);
+        }
+    }
+
+    private static boolean isSelfSigned(X509Certificate cert) {
+        return cert.getSubjectX500Principal().equals(cert.getIssuerX500Principal());
+    }
+
+
 
 }
