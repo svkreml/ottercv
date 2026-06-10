@@ -1,14 +1,13 @@
 package svkreml.certificateViewer.gui.certificateParser;
 
-import jakarta.xml.bind.JAXBContext;
-import jakarta.xml.bind.JAXBException;
-import jakarta.xml.bind.Unmarshaller;
 import lombok.extern.slf4j.Slf4j;
 import org.bouncycastle.util.encoders.Hex;
 import svkreml.certificateViewer.gui.localization.ru.Localization;
 import svkreml.tsl.tsl.ACA;
-import svkreml.tsl.tsl.CertData;
 
+import jakarta.xml.bind.JAXBContext;
+import jakarta.xml.bind.JAXBException;
+import jakarta.xml.bind.Unmarshaller;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 import java.io.*;
@@ -22,16 +21,45 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
+/**
+ * Manages the Trusted Service List (TSL) keystore and local CA folder.
+ * <p>
+ * Responsibilities:
+ * <ul>
+ *   <li>Download TSL XML and convert to BKS keystore</li>
+ *   <li>Cache certificates in memory and on disk</li>
+ *   <li>Load additional root certificates from a local {@code ca/} folder</li>
+ *   <li>Detect stale BKS files (older than 30 days) and refresh automatically</li>
+ * </ul>
+ *
+ * <h3>BKS format</h3>
+ * Certificates are stored in a BouncyCastle KeyStore (BKS) with aliases
+ * encoded as {@code <subject>\t<SKI hex>\t<fingerprint>}.
+ */
 @Slf4j
 public class TslStore {
 
     private static final char[] BKS_PASSWORD = "cgvybtunm,ovgcfre".toCharArray();
     private final Set<X509Certificate> caFolderCerts = ConcurrentHashMap.newKeySet();
 
+    /**
+     * Checks whether the given certificate was loaded from the local CA folder.
+     *
+     * @param cert certificate to check
+     * @return {@code true} if the cert is in the CA folder set
+     */
     public boolean isFromCaFolder(X509Certificate cert) {
         return caFolderCerts.contains(cert);
     }
 
+    /**
+     * Loads the BKS keystore from disk, refreshing if stale (>30 days old).
+     * If the file doesn't exist, downloads the TSL and creates it.
+     *
+     * @param localization application localization (provides BKS file path)
+     * @return loaded or freshly-created keystore
+     * @throws Exception on I/O or crypto errors
+     */
     public KeyStore loadKeyStore(Localization localization) throws
             KeyStoreException,
             NoSuchProviderException,
@@ -69,6 +97,15 @@ public class TslStore {
         return convertXmlToBks(localization);
     }
 
+    /**
+     * Downloads the TSL XML and parses all certificates from it.
+     *
+     * @param localization application localization (provides TSL URL)
+     * @return set of unexpired certificates from the TSL
+     * @throws IOException on network errors
+     * @throws JAXBException on XML parse errors
+     * @throws CertificateException on certificate parse errors
+     */
     public Set<X509Certificate> downloadTsl(Localization localization)
             throws IOException, JAXBException, CertificateException {
         URL url = URI.create(localization.TSL_LOCATION).toURL();
@@ -80,7 +117,7 @@ public class TslStore {
             for (ACA.CA CA : tsl.getCA()) {
                 for (ACA.CA.PAKs.PAK PAK : CA.getPAKs().getPAK()) {
                     for (ACA.CA.PAKs.PAK.Keys.Key key : PAK.getKeys().getKey()) {
-                        for (CertData certData : key.getCerts().getCertData()) {
+                        for (svkreml.tsl.tsl.CertData certData : key.getCerts().getCertData()) {
                             list.add(KeyParser.loadCertificate(certData.getRawCert()));
                         }
                     }
@@ -141,6 +178,13 @@ public class TslStore {
         return trusted1;
     }
 
+    /**
+     * Loads root certificates from a local {@code ca/} folder next to the BKS file
+     * and adds them to both the keystore and the in-memory set.
+     *
+     * @param keyStore   BKS keystore to add certificates to
+     * @param bksFilePath path to the BKS file (parent directory is used to find {@code ca/})
+     */
     private void addRootCertsFromCaFolder(KeyStore keyStore, String bksFilePath) {
         caFolderCerts.clear();
         File caDir = new File(new File(bksFilePath).getParentFile(), "ca");

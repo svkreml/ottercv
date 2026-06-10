@@ -16,6 +16,7 @@ import org.slf4j.LoggerFactory;
 import svkreml.certificateViewer.gui.api.model.CertificateModel;
 import svkreml.certificateViewer.gui.api.model.CertificateStatus;
 import svkreml.certificateViewer.gui.certificateParser.CertificateParser;
+import svkreml.certificateViewer.gui.certificateParser.CertificateValidator;
 import svkreml.certificateViewer.gui.localization.ru.Localization;
 import svkreml.certificateViewer.gui.view.tabs.TabChain;
 import svkreml.certificateViewer.gui.view.tabs.TabDetails;
@@ -136,9 +137,9 @@ public class APP extends Application {
     public void validateCert(X509CertificateHolder x509CertificateHolder, CertificateModel certificateModel) {
         try {
             log.info("Validating cert subject={}", x509CertificateHolder.getSubject());
-            CertificateParser.Validate
+            CertificateValidator
                     validate =
-                    new CertificateParser.Validate(localization, x509CertificateHolder).invoke();
+                    new CertificateValidator(localization, x509CertificateHolder).invoke();
 
             List<String> verificationDetails = validate.getVerificationDetails();
             CertificateStatus certificateStatus = validate.getCertificateStatus();

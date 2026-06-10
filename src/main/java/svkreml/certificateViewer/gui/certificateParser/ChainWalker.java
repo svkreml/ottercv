@@ -8,15 +8,34 @@ import java.security.cert.X509Certificate;
 import java.util.*;
 import java.util.stream.Collectors;
 
+/**
+ * Walks the certificate chain from a leaf cert toward a root using AKI/SKI matching.
+ * <p>
+ * For each certificate, the walker looks up the issuer in the keystore by matching
+ * the certificate's Authority Key Identifier (AKI) against Subject Key Identifiers (SKI)
+ * of certificates stored in the keystore. When multiple candidates share the same SKI,
+ * {@link #pickOne} disambiguates by preferring self-signed certificates.
+ * <p>
+ * A visited-set prevents infinite loops on circular AKI references.
+ */
 @Slf4j
 public class ChainWalker {
 
+    /**
+     * Builds a trust chain from {@code leafCert} toward a root by walking AKI→SKI links
+     * in the given keystore.
+     *
+     * @param keystore  BKS keystore containing trusted/known certificates
+     * @param leafCert  the certificate whose chain to build
+     * @return ordered set of chain certificates (excluding the leaf itself),
+     *         from issuer closest to leaf to root; empty if no chain found
+     */
     public Set<X509Certificate> buildChain(KeyStore keystore, X509Certificate leafCert) {
         LinkedHashSet<X509Certificate> chain = new LinkedHashSet<>();
         log.debug("buildChain for cert subject={}", leafCert.getSubjectX500Principal());
 
         final byte[] akiRaw = CertUtils.getAuthKeyIdentifier(leafCert);
-        final byte[] skiRaw = CertUtils.getSubKeyIdentifier(leafCert);
+        final byte[] skiRaw = CertUtils.getSubjectKeyIdentifier(leafCert);
         log.debug("Leaf cert AKI={}, SKI={}",
                 akiRaw != null ? Hex.toHexString(akiRaw) : "null",
                 skiRaw != null ? Hex.toHexString(skiRaw) : "null");
@@ -64,7 +83,7 @@ public class ChainWalker {
 
             byte[] parentAki = CertUtils.getAuthKeyIdentifier(parentCert);
             if (parentAki == null) {
-                byte[] parentSki = CertUtils.getSubKeyIdentifier(parentCert);
+                byte[] parentSki = CertUtils.getSubjectKeyIdentifier(parentCert);
                 if (parentSki != null) {
                     X509Certificate root = pickOne(findBySki(keystore, parentSki), parentCert);
                     if (root != null) {
@@ -87,6 +106,20 @@ public class ChainWalker {
         return chain;
     }
 
+    /**
+     * Selects the best parent from multiple candidates sharing the same SKI.
+     * <p>
+     * Disambiguation strategy:
+     * <ol>
+     *   <li>Filter by Subject == child's Issuer (issuer match)</li>
+     *   <li>If multiple remain, prefer self-signed certificates (shortest chain)</li>
+     *   <li>Fallback: return the first candidate</li>
+     * </ol>
+     *
+     * @param candidates  certificates with matching SKI
+     * @param childCert   the child certificate being resolved
+     * @return the best matching parent, or {@code null} if candidates is empty
+     */
     private X509Certificate pickOne(List<X509Certificate> candidates, X509Certificate childCert) {
         if (candidates.isEmpty()) return null;
         if (candidates.size() == 1) return candidates.get(0);
@@ -121,6 +154,13 @@ public class ChainWalker {
         return chosen;
     }
 
+    /**
+     * Searches the keystore for certificates whose SKI matches the given bytes.
+     *
+     * @param keyStore BKS keystore to search
+     * @param skiToFind SKI bytes to match
+     * @return list of matching certificates (may be empty)
+     */
     private List<X509Certificate> findBySki(KeyStore keyStore, byte[] skiToFind) {
         List<X509Certificate> result = new ArrayList<>();
         try {
@@ -128,12 +168,12 @@ public class ChainWalker {
             while (aliases.hasMoreElements()) {
                 String alias = aliases.nextElement();
                 java.security.cert.Certificate cert = keyStore.getCertificate(alias);
-                if (cert == null || !(cert instanceof X509Certificate)) continue;
-                byte[] ski = CertUtils.getSubjectKeyIdentifier((X509Certificate) cert);
+                if (!(cert instanceof X509Certificate x509)) continue;
+                byte[] ski = CertUtils.getSubjectKeyIdentifier(x509);
                 if (ski != null && Arrays.equals(ski, skiToFind)) {
                     log.debug("Found cert by SKI match: alias={}, subject={}", alias,
-                            ((X509Certificate) cert).getSubjectX500Principal());
-                    result.add((X509Certificate) cert);
+                            x509.getSubjectX500Principal());
+                    result.add(x509);
                 }
             }
         } catch (Exception e) {

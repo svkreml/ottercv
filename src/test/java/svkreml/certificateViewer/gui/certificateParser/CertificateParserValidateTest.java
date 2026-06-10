@@ -27,7 +27,7 @@ class CertificateParserValidateTest {
         Localization localization = new Localization();
         localization.TSL_LOCATION_BKS = TestCertUtils.createTempBksWithHolder(holder);
 
-        CertificateParser.Validate validate = new CertificateParser.Validate(localization, holder);
+        CertificateValidator validate = new CertificateValidator(localization, holder);
         validate.invoke();
 
         assertThat(validate).isNotNull();
@@ -45,7 +45,7 @@ class CertificateParserValidateTest {
         Localization localization = new Localization();
         localization.TSL_LOCATION_BKS = TestCertUtils.createTempBksWithHolder(holder);
 
-        CertificateParser.Validate validate = new CertificateParser.Validate(localization, holder);
+        CertificateValidator validate = new CertificateValidator(localization, holder);
         validate.invoke();
 
         assertThat(validate).isNotNull();
@@ -63,7 +63,7 @@ class CertificateParserValidateTest {
         Localization localization = new Localization();
         localization.TSL_LOCATION_BKS = TestCertUtils.createTempBksWithHolder(holder);
 
-        CertificateParser.Validate validate = new CertificateParser.Validate(localization, holder);
+        CertificateValidator validate = new CertificateValidator(localization, holder);
         validate.invoke();
 
         for (CertificateModel.CertificateChain chain : validate.getCertificateChains()) {
@@ -82,13 +82,13 @@ class CertificateParserValidateTest {
         Localization localization = new Localization();
         localization.TSL_LOCATION_BKS = TestCertUtils.createTempBksWithHolders(selfSigned, issued);
 
-        CertificateParser.Validate validateSelfSigned = new CertificateParser.Validate(localization, selfSigned);
+        CertificateValidator validateSelfSigned = new CertificateValidator(localization, selfSigned);
         validateSelfSigned.invoke();
 
         assertThat(validateSelfSigned.getCertificateStatus())
                 .isIn(CertificateStatus.TRUSTED, CertificateStatus.BROKEN, CertificateStatus.UNTRUSTED_ROOT);
 
-        CertificateParser.Validate validateIssued = new CertificateParser.Validate(localization, issued);
+        CertificateValidator validateIssued = new CertificateValidator(localization, issued);
         validateIssued.invoke();
 
         assertThat(validateIssued.getCertificateStatus())
@@ -103,7 +103,7 @@ class CertificateParserValidateTest {
         Localization localization = new Localization();
         localization.TSL_LOCATION_BKS = TestCertUtils.createTempBksWithHolders(selfSignedHolder, fkHolder);
 
-        CertificateParser.Validate validate = new CertificateParser.Validate(localization, fkHolder);
+        CertificateValidator validate = new CertificateValidator(localization, fkHolder);
         validate.invoke();
 
         assertThat(validate).isNotNull();
@@ -122,7 +122,7 @@ class CertificateParserValidateTest {
         Localization localization = new Localization();
         localization.TSL_LOCATION_BKS = TestCertUtils.createTempBksWithHolders(selfSignedHolder, crossHolder);
 
-        CertificateParser.Validate validate = new CertificateParser.Validate(localization, crossHolder);
+        CertificateValidator validate = new CertificateValidator(localization, crossHolder);
         validate.invoke();
 
         assertThat(validate).isNotNull();

@@ -16,12 +16,38 @@ import java.security.PublicKey;
 import java.security.cert.Certificate;
 import java.security.cert.*;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
+/**
+ * Certificate Revocation List (CRL) verifier.
+ * <p>
+ * Downloads CRLs from distribution points specified in certificates,
+ * caches them in memory, and checks whether a certificate has been revoked.
+ * CRL signatures are verified against the issuer's public key from the cert path.
+ *
+ * <h3>Caching</h3>
+ * Downloaded CRLs are cached per certificate in a thread-safe
+ * {@link ConcurrentHashMap}. A cached CRL is re-used until its
+ * {@code nextUpdate} time passes.
+ */
 @Slf4j
-public class CRLVerifier {
+public final class CRLVerifier {
 
-    static HashMap<X509Certificate, X509CRL> cachedCrl = new HashMap<>();
+    private static final Map<X509Certificate, X509CRL> cachedCrl = new ConcurrentHashMap<>();
 
+    private CRLVerifier() {
+    }
+
+    /**
+     * Verifies that the given certificate has not been revoked according to its CRL.
+     * <p>
+     * The method downloads CRLs from all distribution points listed in the certificate,
+     * verifies each CRL's signature, and checks the revocation status.
+     *
+     * @param cert               certificate to check
+     * @param verifiedCertChain  the verified PKIX cert path (used to get the issuer's public key)
+     * @throws CertificateVerificationException if no valid CRL is found or the cert is revoked
+     */
     public static void verifyCertificateCRLs(X509Certificate cert, PKIXCertPathBuilderResult verifiedCertChain)
             throws CertificateVerificationException {
         try {
@@ -77,41 +103,47 @@ public class CRLVerifier {
         }
     }
 
-
+    /**
+     * Extracts CRL Distribution Point URLs from a certificate's extensions.
+     *
+     * @param cert X.509 certificate to inspect
+     * @return list of CRL URLs, empty if extension is absent
+     * @throws IOException if ASN.1 parsing fails
+     */
     public static List<String> getCrlDistributionPoints(
             X509Certificate cert) throws IOException {
         byte[] crldpExt = cert.getExtensionValue(
                 Extension.cRLDistributionPoints.getId());
         if (crldpExt == null) {
-            return new ArrayList<>();
+            return List.of();
         }
-        ASN1InputStream oAsnInStream = new ASN1InputStream(
-                new ByteArrayInputStream(crldpExt));
-        ASN1Primitive derObjCrlDP = oAsnInStream.readObject();
-        DEROctetString dosCrlDP = (DEROctetString) derObjCrlDP;
-        byte[] crldpExtOctets = dosCrlDP.getOctets();
-        ASN1InputStream oAsnInStream2 = new ASN1InputStream(
-                new ByteArrayInputStream(crldpExtOctets));
-        ASN1Primitive derObj2 = oAsnInStream2.readObject();
-        CRLDistPoint distPoint = CRLDistPoint.getInstance(derObj2);
-        List<String> crlUrls = new ArrayList<>();
-        for (DistributionPoint dp : distPoint.getDistributionPoints()) {
-            DistributionPointName dpn = dp.getDistributionPoint();
-            if (dpn != null) {
-                if (dpn.getType() == DistributionPointName.FULL_NAME) {
-                    GeneralName[] genNames = GeneralNames.getInstance(
-                            dpn.getName()).getNames();
-                    for (GeneralName genName : genNames) {
-                        if (genName.getTagNo() == GeneralName.uniformResourceIdentifier) {
-                            String url = DERIA5String.getInstance(
-                                    genName.getName()).getString();
-                            crlUrls.add(url);
+        try (ASN1InputStream oAsnInStream = new ASN1InputStream(
+                new ByteArrayInputStream(crldpExt))) {
+            ASN1Primitive derObjCrlDP = oAsnInStream.readObject();
+            DEROctetString dosCrlDP = (DEROctetString) derObjCrlDP;
+            byte[] crldpExtOctets = dosCrlDP.getOctets();
+            try (ASN1InputStream oAsnInStream2 = new ASN1InputStream(
+                    new ByteArrayInputStream(crldpExtOctets))) {
+                ASN1Primitive derObj2 = oAsnInStream2.readObject();
+                CRLDistPoint distPoint = CRLDistPoint.getInstance(derObj2);
+                List<String> crlUrls = new ArrayList<>();
+                for (DistributionPoint dp : distPoint.getDistributionPoints()) {
+                    DistributionPointName dpn = dp.getDistributionPoint();
+                    if (dpn != null && dpn.getType() == DistributionPointName.FULL_NAME) {
+                        GeneralName[] genNames = GeneralNames.getInstance(
+                                dpn.getName()).getNames();
+                        for (GeneralName genName : genNames) {
+                            if (genName.getTagNo() == GeneralName.uniformResourceIdentifier) {
+                                String url = DERIA5String.getInstance(
+                                        genName.getName()).getString();
+                                crlUrls.add(url);
+                            }
                         }
                     }
                 }
+                return crlUrls;
             }
         }
-        return crlUrls;
     }
 
 }

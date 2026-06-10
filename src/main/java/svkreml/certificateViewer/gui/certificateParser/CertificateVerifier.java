@@ -6,6 +6,19 @@ import java.security.*;
 import java.security.cert.*;
 import java.util.*;
 
+/**
+ * PKIX certificate path builder and verifier using BouncyCastle provider.
+ * <p>
+ * Separates certificates into trust anchors (self-signed roots) and intermediates,
+ * then uses {@link CertPathBuilder} to construct and verify a valid X.509 path.
+ * CRL revocation checking is delegated to {@link CRLVerifier}.
+ *
+ * <h3>Usage</h3>
+ * <pre>{@code
+ * var verifier = new CertificateVerifier(chainCerts);
+ * PKIXCertPathBuilderResult result = verifier.verifyCertificate(cert);
+ * }</pre>
+ */
 @Slf4j
 public class CertificateVerifier {
     Set<X509Certificate> trustedRootCerts = new HashSet<>();
@@ -15,6 +28,15 @@ public class CertificateVerifier {
     CertStore certStore;
     X509CertSelector selector = new X509CertSelector();
 
+    /**
+     * Initializes the verifier by partitioning the given certificates into
+     * trust anchors (self-signed) and intermediates.
+     *
+     * @param additionalCerts certificates to use as trust anchors and intermediates
+     * @throws NoSuchAlgorithmException    if PKIX algorithm is unavailable
+     * @throws NoSuchProviderException     if BC provider is not registered
+     * @throws InvalidAlgorithmParameterException if trust anchors are invalid
+     */
     public CertificateVerifier(Set<X509Certificate> additionalCerts) throws
             NoSuchAlgorithmException,
             NoSuchProviderException,
@@ -30,8 +52,6 @@ public class CertificateVerifier {
                 intermediateCerts.add(additionalCert);
             }
         }
-        // Create the trust anchors (set of root CA certificates)
-
         for (X509Certificate trustedRootCert : trustedRootCerts) {
             trustAnchors.add(new TrustAnchor(trustedRootCert, null));
         }
@@ -44,6 +64,13 @@ public class CertificateVerifier {
                 trustedRootCerts.size(), intermediateCerts.size(), (stop - start));
     }
 
+    /**
+     * Checks whether a certificate is self-signed by comparing Subject/Issuer DNs
+     * and verifying the signature against the certificate's own public key.
+     *
+     * @param cert certificate to check
+     * @return {@code true} if the certificate is self-signed and signature is valid
+     */
     public static boolean isSelfSigned(X509Certificate cert) {
         try {
             if (!cert.getIssuerX500Principal().equals(cert.getSubjectX500Principal())) {
@@ -74,14 +101,21 @@ public class CertificateVerifier {
         List<CertStore> stores = new ArrayList<>();
         stores.add(certStore);
 
-        // кладём сертификат,который будем проверять, зачем-то..., кладём отдельно, чтобы он потом нигде не остался
         stores.add(CertStore.getInstance("Collection",
-                new CollectionCertStoreParameters(Collections.singletonList(cert)),
+                new CollectionCertStoreParameters(List.of(cert)),
                 "BC"));
         pkixParams.setCertStores(stores);
         return (PKIXCertPathBuilderResult) certPathBuilder.build(pkixParams);
     }
 
+    /**
+     * Verifies a certificate by building a PKIX cert path and checking CRL revocation.
+     *
+     * @param cert certificate to verify
+     * @return the verified PKIX cert path builder result
+     * @throws CertificateVerificationException if CRL check fails
+     * @throws GeneralSecurityException if path building fails
+     */
     public PKIXCertPathBuilderResult verifyCertificate(X509Certificate cert)
             throws CertificateVerificationException, GeneralSecurityException {
 
