@@ -56,16 +56,13 @@ class TrustChainBuilderTest {
         bks.load(null, "cgvybtunm,ovgcfre".toCharArray());
 
         bks.setCertificateEntry(
-                CustomBCStyle.INSTANCE.toString(X500Name.getInstance(rootCert.getSubjectX500Principal().getEncoded()))
-                        + " " + Hex.toHexString(getSki(rootCert)),
+                Hex.toHexString(getSki(rootCert)),
                 rootCert);
         bks.setCertificateEntry(
-                CustomBCStyle.INSTANCE.toString(X500Name.getInstance(interCert.getSubjectX500Principal().getEncoded()))
-                        + " " + Hex.toHexString(getSki(interCert)),
+                Hex.toHexString(getSki(interCert)),
                 interCert);
         bks.setCertificateEntry(
-                CustomBCStyle.INSTANCE.toString(X500Name.getInstance(leafCert.getSubjectX500Principal().getEncoded()))
-                        + " " + Hex.toHexString(getSki(leafCert)),
+                Hex.toHexString(getSki(leafCert)),
                 leafCert);
 
         byte[] keyBytes = ("" + System.currentTimeMillis()).getBytes();
@@ -104,15 +101,15 @@ class TrustChainBuilderTest {
       builder.addExtension(Extension.basicConstraints, true, new BasicConstraints(true));
         SubjectKeyIdentifier ski = new SubjectKeyIdentifier(keyPair.getPublic().getEncoded());
         builder.addExtension(Extension.subjectKeyIdentifier, false, ski);
-        
+
         PublicKey akiPublicKey = issuerPublicKey != null ? issuerPublicKey : keyPair.getPublic();
         AuthorityKeyIdentifier aki = new AuthorityKeyIdentifier(akiPublicKey.getEncoded());
         builder.addExtension(Extension.authorityKeyIdentifier, false, aki);
-        
+
         ContentSigner signer = new JcaContentSignerBuilder("SHA256withRSA").build(keyPair.getPrivate());
         return convertToX509Cert(builder.build(signer));
     }
-    
+
     private X509Certificate generateEndEntityCert(X500Name subject, KeyPair keyPair, X500Name issuer, PublicKey issuerPublicKey) throws Exception {
         JcaX509v3CertificateBuilder builder = new JcaX509v3CertificateBuilder(
                 issuer,
@@ -122,7 +119,7 @@ class TrustChainBuilderTest {
                 subject,
                 keyPair.getPublic()
         );
-        
+
         builder.addExtension(Extension.basicConstraints, true, new BasicConstraints(false));
         SubjectKeyIdentifier ski = new SubjectKeyIdentifier(keyPair.getPublic().getEncoded());
         builder.addExtension(Extension.subjectKeyIdentifier, false, ski);
