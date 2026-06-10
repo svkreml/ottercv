@@ -21,8 +21,11 @@ public class CertificateVerifier {
             NoSuchProviderException,
             InvalidAlgorithmParameterException {
         long start = System.currentTimeMillis();
+        log.debug("Initializing CertificateVerifier with {} certs", additionalCerts.size());
         for (X509Certificate additionalCert : additionalCerts) {
-            if (isSelfSigned(additionalCert)) {
+            boolean selfSigned = isSelfSigned(additionalCert);
+            log.debug("Cert subject={}, selfSigned={}", additionalCert.getSubjectX500Principal(), selfSigned);
+            if (selfSigned) {
                 trustedRootCerts.add(additionalCert);
             } else {
                 intermediateCerts.add(additionalCert);
@@ -38,7 +41,8 @@ public class CertificateVerifier {
 
         certStore = CertStore.getInstance("Collection", new CollectionCertStoreParameters(intermediateCerts), "BC");
         long stop = System.currentTimeMillis();
-        log.debug("Init CertificateVerifier: {}", (stop - start));
+        log.info("CertificateVerifier initialized: {} roots, {} intermediates, {} ms",
+                trustedRootCerts.size(), intermediateCerts.size(), (stop - start));
     }
 
     public static boolean isSelfSigned(X509Certificate cert)

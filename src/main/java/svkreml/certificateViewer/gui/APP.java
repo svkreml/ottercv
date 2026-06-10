@@ -135,12 +135,14 @@ public class APP extends Application {
 
     private void validateCert(X509CertificateHolder x509CertificateHolder, CertificateModel certificateModel) {
         try {
+            log.info("Validating cert subject={}", x509CertificateHolder.getSubject());
             CertificateParser.Validate
                     validate =
                     new CertificateParser.Validate(localization, x509CertificateHolder).invoke();
 
             List<String> verificationDetails = validate.getVerificationDetails();
             CertificateStatus certificateStatus = validate.getCertificateStatus();
+            log.info("Validation result: status={}, details={}", certificateStatus, verificationDetails);
             ArrayList<CertificateModel.CertificateChain> certificateChains = validate.getCertificateChains();
 
             Platform.runLater(() -> {

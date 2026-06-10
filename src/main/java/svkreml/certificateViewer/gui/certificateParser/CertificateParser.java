@@ -27,6 +27,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
 import java.security.cert.CertificateException;
+import java.security.cert.PKIXCertPathBuilderResult;
 import java.security.cert.X509Certificate;
 import java.util.*;
 
@@ -218,17 +219,54 @@ public class CertificateParser {
         private static CertificateStatus getCertificateStatus(X509CertificateHolder x509CertificateHolder,
                                                               List<String> verificationDetails,
                                                               CertificateVerifier certificateVerifier) {
+            X509Certificate cert;
+            try {
+                cert = KeyParser.loadCertificate(x509CertificateHolder.getEncoded());
+            } catch (Exception e) {
+                log.error("Failed to parse certificate for status check", e);
+                if (verificationDetails != null) verificationDetails.add("Failed to parse certificate: " + e.getMessage());
+                return CertificateStatus.BROKEN;
+            }
             CertificateStatus certificateStatus;
             try {
-                certificateVerifier.verifyCertificate(KeyParser.loadCertificate(x509CertificateHolder.getEncoded()));
-                if (verificationDetails != null) verificationDetails.add("Сертификат находится в TSL");
+                log.debug("Verifying cert subject={}", cert.getSubjectX500Principal());
+                PKIXCertPathBuilderResult verifiedCertChain = certificateVerifier.verifyCertificate(cert);
+                log.debug("Verification succeeded, chain length={}, trustAnchor={}",
+                        verifiedCertChain.getCertPath().getCertificates().size(),
+                        verifiedCertChain.getTrustAnchor() != null ?
+                                verifiedCertChain.getTrustAnchor().getTrustedCert().getSubjectX500Principal() : "null");
+
+                boolean trustedViaCaFolder = false;
+                for (java.security.cert.Certificate c : verifiedCertChain.getCertPath().getCertificates()) {
+                    X509Certificate xc = (X509Certificate) c;
+                    log.debug("Checking chain cert subject={}, isFromCaFolder={}",
+                            xc.getSubjectX500Principal(), TrustChainBuilder.isFromCaFolder(xc));
+                    if (TrustChainBuilder.isFromCaFolder(xc)) {
+                        trustedViaCaFolder = true;
+                        break;
+                    }
+                }
+                if (!trustedViaCaFolder && verifiedCertChain.getTrustAnchor() != null) {
+                    X509Certificate ta = verifiedCertChain.getTrustAnchor().getTrustedCert();
+                    log.debug("Checking trust anchor subject={}, isFromCaFolder={}",
+                            ta.getSubjectX500Principal(), TrustChainBuilder.isFromCaFolder(ta));
+                    trustedViaCaFolder = TrustChainBuilder.isFromCaFolder(ta);
+                }
+
+                String statusMsg = trustedViaCaFolder ? Messages.CERTIFICATE_TRUSTED_VIA_CA_FOLDER : Messages.CERTIFICATE_IN_TSL;
+                log.info("Trust source: {}", trustedViaCaFolder ? "CA_FOLDER" : "TSL");
+                if (verificationDetails != null) {
+                    verificationDetails.add(statusMsg);
+                }
                 certificateStatus = CertificateStatus.TRUSTED;
             } catch (Exception e) {
-                log.debug("Certificate verification failed", e);
+                log.error("Certificate verification failed for subject={}: {}",
+                        cert.getSubjectX500Principal(), e.getMessage(), e);
                 if (verificationDetails != null) verificationDetails.add(e.getMessage());
                 Throwable cause = e.getCause();
                 while (cause != null) {
                     if (verificationDetails != null) verificationDetails.add(cause.getMessage());
+                    log.debug("Cause: {}", cause.getMessage());
                     cause = cause.getCause();
                 }
                 certificateStatus = CertificateStatus.BROKEN;
@@ -245,7 +283,9 @@ public class CertificateParser {
             verificationDetails = new ArrayList<>();
             Set<X509Certificate> gostTlsStore;
             try {
+                log.debug("Building trust chain for cert subject={}", x509CertificateHolder.getSubject());
                 gostTlsStore = TrustChainBuilder.smallInit(localization, x509CertificateHolder);
+                log.info("Trust chain built, size={}", gostTlsStore.size());
             } catch (Exception e) {
                 log.error("Failed to initialize trust chain builder", e);
                 verificationDetails.add(e.getMessage());
@@ -256,9 +296,11 @@ public class CertificateParser {
 
 
             if (!gostTlsStore.isEmpty()) {
+                log.info("TSL store has {} certificates, building chain via TSL", gostTlsStore.size());
                 CertificateVerifier certificateVerifier = new CertificateVerifier(gostTlsStore);
                 certificateStatus =
                         getCertificateStatus(x509CertificateHolder, verificationDetails, certificateVerifier);
+                log.debug("Main cert status: {}", certificateStatus);
 
                 certificateChains.add(new CertificateModel.CertificateChain(
                         subject.get(X500Name.getDefaultStyle().attrNameToOID("CN")),
@@ -275,6 +317,7 @@ public class CertificateParser {
                             x509CertificateHolder1, verificationDetails1));
                 }
             } else {
+                log.warn("TSL store is empty, marking as UNTRUSTED_ROOT");
                 certificateStatus = CertificateStatus.UNTRUSTED_ROOT;
                 certificateChains.add(
                         new CertificateModel.CertificateChain(

@@ -25,9 +25,17 @@ import java.security.*;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 @Slf4j
 public class TrustChainBuilder {
+    private static final char[] BKS_PASSWORD = "cgvybtunm,ovgcfre".toCharArray();
+    private static final Set<X509Certificate> CA_FOLDER_CERTS = ConcurrentHashMap.newKeySet();
+
+    public static boolean isFromCaFolder(X509Certificate cert) {
+        return CA_FOLDER_CERTS.contains(cert);
+    }
 
     public static Set<X509Certificate> fullInit(Localization localization) throws
             NoSuchProviderException,
@@ -69,40 +77,66 @@ public class TrustChainBuilder {
             UnrecoverableEntryException {
         LinkedHashSet<X509Certificate> set = new LinkedHashSet<>();
         KeyStore trusted = getKeyStore(localization);
-        final byte[] authKeyIdentifier2 = getAuthKeyIdentifier(x509Certificate);
-        if (authKeyIdentifier2 == null) {
-            final byte[] subKeyIdentifier = getSubKeyIdentifier(x509Certificate);
+        log.debug("smallInit for cert subject={}", x509Certificate.getSubjectX500Principal());
+
+        final byte[] authKeyIdentifierRaw = getAuthKeyIdentifier(x509Certificate);
+        final byte[] subKeyIdentifier = getSubKeyIdentifier(x509Certificate);
+        log.debug("Leaf cert AKI={}, SKI={}",
+                authKeyIdentifierRaw != null ? Hex.toHexString(authKeyIdentifierRaw) : "null",
+                subKeyIdentifier != null ? Hex.toHexString(subKeyIdentifier) : "null");
+
+        if (authKeyIdentifierRaw == null) {
             if (subKeyIdentifier != null) {
-                java.security.cert.Certificate certificate = trusted.getCertificate(
-                        CustomBCStyle.INSTANCE.toString(X500Name.getInstance(x509Certificate.getIssuerX500Principal()
-                                .getEncoded()))
-                                + " " + Hex.toHexString((Objects.requireNonNull(subKeyIdentifier))));
-                if (certificate == null) return set;
+                String lookupAlias = Hex.toHexString(subKeyIdentifier);
+                log.debug("No AKI, looking up by subject+SKI: {}", lookupAlias);
+                java.security.cert.Certificate certificate = trusted.getCertificate(lookupAlias);
+                if (certificate == null) {
+                    log.debug("Not found in keystore by subject+SKI");
+                    return set;
+                }
                 X509Certificate chainCert = KeyParser.loadCertificate(certificate.getEncoded());
                 if (chainCert == null) return set;
                 set.add(chainCert);
+                log.debug("Found chain cert: {}", chainCert.getSubjectX500Principal());
             }
             return set;
         }
-        String authKeyIdentifier = Hex.toHexString((Objects.requireNonNull(authKeyIdentifier2)));
+
+        String authKeyIdentifier = Hex.toHexString(authKeyIdentifierRaw);
+        int hop = 0;
         while (true) {
-            java.security.cert.Certificate
-                    certificate =
-                    trusted.getCertificate(CustomBCStyle.INSTANCE.toString(X500Name.getInstance(x509Certificate.getIssuerX500Principal()
-                            .getEncoded()))
-                            + " " + authKeyIdentifier);
-            if (certificate == null) break;
+            hop++;
+            String lookupAlias = authKeyIdentifier;
+            log.debug("Hop {}: looking up issuer by AKI={}, alias={}", hop, authKeyIdentifier, lookupAlias);
+
+            java.security.cert.Certificate certificate = trusted.getCertificate(authKeyIdentifier);
+            if (certificate == null) {
+                log.debug("Hop {}: issuer not found in keystore, chain ends", hop);
+                break;
+            }
             X509Certificate chainCert = KeyParser.loadCertificate(certificate.getEncoded());
-            if (chainCert == null) break;
+            if (chainCert == null) {
+                log.debug("Hop {}: failed to parse issuer cert", hop);
+                break;
+            }
             set.add(chainCert);
+            log.debug("Hop {}: found issuer: subject={}", hop, chainCert.getSubjectX500Principal());
+
             byte[] authKeyIdentifier1 = getAuthKeyIdentifier(chainCert);
-            if (authKeyIdentifier1 == null)
+            if (authKeyIdentifier1 == null) {
+                log.debug("Hop {}: issuer has no AKI, chain ends", hop);
                 break;
-            String s = Hex.toHexString(authKeyIdentifier1);
-            if (s.equals(authKeyIdentifier))
+            }
+            String nextAki = Hex.toHexString(authKeyIdentifier1);
+            log.debug("Hop {}: issuer AKI={}", hop, nextAki);
+            if (nextAki.equals(authKeyIdentifier)) {
+                log.debug("Hop {}: AKI loop detected, chain ends", hop);
                 break;
-            authKeyIdentifier = s;
+            }
+            authKeyIdentifier = nextAki;
+            x509Certificate = chainCert;
         }
+        log.info("smallInit completed, chain size: {}", set.size());
         return set;
     }
 
@@ -117,8 +151,10 @@ public class TrustChainBuilder {
         KeyStore trusted = KeyStore.getInstance("BKS", "BC");
         String tsl_location_bks = localization.TSL_LOCATION_BKS;
         File file = new File(tsl_location_bks);
+        log.debug("BKS path: {}", tsl_location_bks);
         if (file.exists()) {
-            trusted.load(new FileInputStream(tsl_location_bks), "cgvybtunm,ovgcfre".toCharArray());
+            log.debug("BKS exists, loading...");
+            trusted.load(new FileInputStream(tsl_location_bks), BKS_PASSWORD);
             addRootCertsFromCaFolder(trusted, tsl_location_bks);
 
             Date createDate = new Date(Long.parseLong(
@@ -128,11 +164,12 @@ public class TrustChainBuilder {
             );
             Calendar cal = Calendar.getInstance();
             cal.add(Calendar.DATE, -30);
+            log.debug("BKS creation date: {}, threshold: {}", createDate, cal.getTime());
             if (createDate.before(cal.getTime())) {
-                log.info("Tsl уже старый, обновим");
+                log.info("Tsl уже старый ({}), обновим", createDate);
                 return convertXmlToBks(localization);
             }
-            log.info("Tsl ещё не старый, используем");
+            log.info("Tsl ещё не старый ({}), используем существующий", createDate);
             return trusted;
         }
         log.info("Tsl ещё не создан, создаём");
@@ -149,6 +186,10 @@ public class TrustChainBuilder {
             CertificateException {
         log.info("Качаем TSL {}", localization.TSL_LOCATION);
         Set<X509Certificate> list = gostTlsStore(localization);
+        log.info("TSL downloaded, certs count: {}", list.size());
+
+        list = list.stream().filter(c -> c.getNotAfter().after(new Date())).collect(Collectors.toSet());
+
         return initTLSStore(localization, list);
     }
 
@@ -161,13 +202,15 @@ public class TrustChainBuilder {
 
         KeyStore trusted1 = KeyStore.getInstance("BKS", "BC");
 
-        trusted1.load(null, "cgvybtunm,ovgcfre".toCharArray());
+        trusted1.load(null, BKS_PASSWORD);
+        int count = 0;
         for (X509Certificate x509Certificate : list) {
-            trusted1.setCertificateEntry(CustomBCStyle.INSTANCE.toString(X500Name.getInstance(x509Certificate.getIssuerX500Principal()
-                            .getEncoded()))
-                            + " "
-                            + Hex.toHexString(Objects.requireNonNull(getSubjectKeyIdentifier(x509Certificate))),
-                    x509Certificate);
+            String alias = Hex.toHexString(Objects.requireNonNull(getSubjectKeyIdentifier(x509Certificate)));
+            trusted1.setCertificateEntry(alias, x509Certificate);
+            log.debug("Stored TSL cert #{}: alias={}, subject={}",
+                    ++count,
+                    alias,
+                    x509Certificate.getSubjectX500Principal());
         }
         addRootCertsFromCaFolder(trusted1, localization.TSL_LOCATION_BKS);
         byte[] keyBytes = ("" + new Date().getTime()).getBytes();
@@ -177,7 +220,8 @@ public class TrustChainBuilder {
 
         KeyStore.ProtectionParameter params = new KeyStore.PasswordProtection("creation date".toCharArray());
         trusted1.setEntry("info", entry, params);
-        trusted1.store(new FileOutputStream(localization.TSL_LOCATION_BKS), "cgvybtunm,ovgcfre".toCharArray());
+        trusted1.store(new FileOutputStream(localization.TSL_LOCATION_BKS), BKS_PASSWORD);
+        log.info("BKS saved to {}, total certs: {}", localization.TSL_LOCATION_BKS, count);
         return trusted1;
     }
 
@@ -203,34 +247,44 @@ public class TrustChainBuilder {
     }
 
     private static void addRootCertsFromCaFolder(KeyStore keyStore, String bksFilePath) {
+        CA_FOLDER_CERTS.clear();
         File caDir = new File(new File(bksFilePath).getParentFile(), "ca");
+        log.debug("CA folder path: {}", caDir.getAbsolutePath());
         if (!caDir.exists() || !caDir.isDirectory()) {
+            log.debug("CA folder does not exist or is not a directory");
             return;
         }
         File[] files = caDir.listFiles();
         if (files == null) {
+            log.debug("CA folder is empty or cannot be listed");
             return;
         }
+        log.debug("CA folder contains {} files", files.length);
+        int added = 0;
         for (File file : files) {
             if (!file.isFile()) continue;
             try {
                 X509Certificate cert = KeyParser.loadCertificate(Files.readAllBytes(file.toPath()));
                 byte[] ski = getSubjectKeyIdentifier(cert);
                 if (ski == null) {
-                    log.debug("Skipping certificate {}: no Subject Key Identifier", file.getName());
+                    log.warn("Skipping CA certificate {}: no Subject Key Identifier", file.getName());
                     continue;
                 }
                 String
                         alias =
-                        CustomBCStyle.INSTANCE.toString(X500Name.getInstance(cert.getIssuerX500Principal()
+                        CustomBCStyle.INSTANCE.toString(X500Name.getInstance(cert.getSubjectX500Principal()
                                 .getEncoded()))
                                 + " " + Hex.toHexString(ski);
                 keyStore.setCertificateEntry(alias, cert);
-                log.debug("Added root certificate from {}", file.getName());
+                CA_FOLDER_CERTS.add(cert);
+                log.debug("Added root certificate from {}: subject={}, ski={}", file.getName(),
+                        cert.getSubjectX500Principal(), Hex.toHexString(ski));
+                added++;
             } catch (Exception e) {
                 log.error("Failed to load certificate from {}: {}", file.getName(), e.getMessage(), e);
             }
         }
+        log.info("Added {} certificates from CA folder", added);
     }
 
     private static byte[] getSubjectKeyIdentifier(X509Certificate certificate) {
@@ -246,12 +300,9 @@ public class TrustChainBuilder {
     private static byte[] getAuthKeyIdentifier(X509Certificate certificate) {
         try {
             byte[] value = certificate.getExtensionValue("2.5.29.35");
-            if (value.length < 28)
-                return AuthorityKeyIdentifier.getInstance(Arrays.copyOfRange(value, 2, value.length))
-                        .getKeyIdentifier();
-            else
-                return AuthorityKeyIdentifier.getInstance(Arrays.copyOfRange(value, 4, value.length))
-                        .getKeyIdentifier();
+            return AuthorityKeyIdentifier.getInstance(
+                    org.bouncycastle.asn1.ASN1OctetString.getInstance(value).getOctets()
+            ).getKeyIdentifier();
         } catch (Exception e) {
             return null;
         }
@@ -260,10 +311,9 @@ public class TrustChainBuilder {
     private static byte[] getSubKeyIdentifier(X509Certificate certificate) {
         try {
             byte[] value = certificate.getExtensionValue("2.5.29.14");
-            if (value.length < 28)
-                return SubjectKeyIdentifier.getInstance(Arrays.copyOfRange(value, 2, value.length)).getKeyIdentifier();
-            else
-                return SubjectKeyIdentifier.getInstance(Arrays.copyOfRange(value, 4, value.length)).getKeyIdentifier();
+            return SubjectKeyIdentifier.getInstance(
+                    org.bouncycastle.asn1.ASN1OctetString.getInstance(value).getOctets()
+            ).getKeyIdentifier();
         } catch (Exception e) {
             return null;
         }

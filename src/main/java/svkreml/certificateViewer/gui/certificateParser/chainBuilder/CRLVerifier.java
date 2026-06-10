@@ -12,6 +12,7 @@ import svkreml.certificateViewer.gui.view.utils.WebUtils;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.security.PublicKey;
 import java.security.cert.Certificate;
 import java.security.cert.*;
 import java.util.*;
@@ -25,41 +26,57 @@ public class CRLVerifier {
             throws CertificateVerificationException {
         try {
             X509CRL crl = cachedCrl.get(cert);
+            log.debug("CRL check for cert subject={}, cached={}, nextUpdate={}",
+                    cert.getSubjectX500Principal(),
+                    crl != null,
+                    crl != null ? crl.getNextUpdate() : "null");
             if (crl == null || crl.getNextUpdate().before(new Date())) {
                 List<String> crlDistPoints = getCrlDistributionPoints(cert);
+                log.debug("CRL distribution points: {}", crlDistPoints);
                 for (String crlDP : crlDistPoints) {
                     try {
-                        log.info("Качаем CRL: {}", crlDP);
+                        log.info("Downloading CRL: {}", crlDP);
                         try (InputStream crlStream = WebUtils.download(crlDP)) {
                             CertificateFactory cf = CertificateFactory.getInstance("X.509");
                             crl = (X509CRL) cf.generateCRL(crlStream);
                         }
+                        log.debug("CRL downloaded, nextUpdate={}, revokedCount={}",
+                                crl.getNextUpdate(),
+                                crl.getRevokedCertificates() != null ? crl.getRevokedCertificates().size() : 0);
                         List<? extends Certificate> certificates = verifiedCertChain.getCertPath().getCertificates();
-                        if (certificates.size() <= 1)
-                            crl.verify(verifiedCertChain.getTrustAnchor().getTrustedCert().getPublicKey(), "BC");
-                        else
-                            crl.verify(certificates.getLast().getPublicKey(), "BC");
+                        PublicKey verifierKey = certificates.size() <= 1
+                                ? verifiedCertChain.getTrustAnchor().getTrustedCert().getPublicKey()
+                                : certificates.getLast().getPublicKey();
+                        log.debug("CRL will be verified with key from: {}",
+                                certificates.size() <= 1 ? "trust anchor" : "last chain cert");
+                        crl.verify(verifierKey, "BC");
                         cachedCrl.putIfAbsent(cert, crl);
                         break;
                     } catch (Exception e) {
-                        log.error("Failed to download/verify CRL: {}", crlDP, e);
+                        log.error("Failed to download/verify CRL from {}: {}", crlDP, e.getMessage(), e);
                     }
                 }
             }
-            if (Objects.requireNonNull(crl).isRevoked(cert)) {
+            if (crl == null) {
+                throw new CertificateVerificationException(
+                        "No valid CRL found for certificate: " + cert.getSubjectX500Principal());
+            }
+            if (crl.isRevoked(cert)) {
                 throw new CertificateVerificationException(
                         "The certificate is revoked by CRL: " + crl);
             }
+            log.debug("CRL check passed, cert not revoked");
+        } catch (CertificateVerificationException ex) {
+            throw ex;
         } catch (Exception ex) {
-            if (ex instanceof CertificateVerificationException) {
-                throw (CertificateVerificationException) ex;
-            } else {
-                throw new CertificateVerificationException(
-                        "Can not verify CRL for certificate: " +
-                                cert.getSubjectX500Principal());
-            }
+            log.error("Unexpected error during CRL verification for {}: {}",
+                    cert.getSubjectX500Principal(), ex.getMessage(), ex);
+            throw new CertificateVerificationException(
+                    "Can not verify CRL for certificate: " +
+                            cert.getSubjectX500Principal(), ex);
         }
     }
+
 
     public static List<String> getCrlDistributionPoints(
             X509Certificate cert) throws IOException {
@@ -98,4 +115,3 @@ public class CRLVerifier {
     }
 
 }
-
