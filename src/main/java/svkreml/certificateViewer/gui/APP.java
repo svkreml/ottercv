@@ -133,7 +133,7 @@ public class APP extends Application {
         }
     }
 
-    private void validateCert(X509CertificateHolder x509CertificateHolder, CertificateModel certificateModel) {
+    public void validateCert(X509CertificateHolder x509CertificateHolder, CertificateModel certificateModel) {
         try {
             log.info("Validating cert subject={}", x509CertificateHolder.getSubject());
             CertificateParser.Validate

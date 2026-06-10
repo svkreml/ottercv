@@ -92,12 +92,31 @@ public class TrustChainBuilder {
                 java.security.cert.Certificate certificate = trusted.getCertificate(lookupAlias);
                 if (certificate == null) {
                     log.debug("Not found in keystore by subject+SKI");
-                    return set;
+                } else {
+                    X509Certificate chainCert = KeyParser.loadCertificate(certificate.getEncoded());
+                    if (chainCert == null) return set;
+                    set.add(chainCert);
+                    log.debug("Found chain cert: {}", chainCert.getSubjectX500Principal());
                 }
-                X509Certificate chainCert = KeyParser.loadCertificate(certificate.getEncoded());
-                if (chainCert == null) return set;
-                set.add(chainCert);
-                log.debug("Found chain cert: {}", chainCert.getSubjectX500Principal());
+            }
+            if (set.isEmpty()) {
+                log.debug("No AKI and no SKI match, searching trust store by issuer subject");
+                try {
+                    Enumeration<String> aliases = trusted.aliases();
+                    while (aliases.hasMoreElements()) {
+                        String alias = aliases.nextElement();
+                        java.security.cert.Certificate certificate = trusted.getCertificate(alias);
+                        if (certificate == null || !(certificate instanceof X509Certificate)) continue;
+                        X509Certificate candidate = (X509Certificate) certificate;
+                        if (candidate.getSubjectX500Principal().equals(x509Certificate.getIssuerX500Principal())) {
+                            log.debug("Found potential issuer by subject match: alias={}, subject={}", alias,
+                                    candidate.getSubjectX500Principal());
+                            set.add(candidate);
+                        }
+                    }
+                } catch (Exception e) {
+                    log.debug("Error searching trust store by issuer subject: {}", e.getMessage());
+                }
             }
             return set;
         }
@@ -110,6 +129,29 @@ public class TrustChainBuilder {
             log.debug("Hop {}: looking up issuer by AKI={}, alias={}", hop, authKeyIdentifier, lookupAlias);
 
             java.security.cert.Certificate certificate = trusted.getCertificate(authKeyIdentifier);
+            if (certificate == null) {
+                certificate = findCertificateBySki(trusted, authKeyIdentifierRaw);
+            }
+            if (certificate == null) {
+                log.debug("Hop {}: not found by AKI/SKI, searching trust store by issuer subject", hop);
+                try {
+                    Enumeration<String> aliases = trusted.aliases();
+                    while (aliases.hasMoreElements()) {
+                        String alias = aliases.nextElement();
+                        java.security.cert.Certificate cert = trusted.getCertificate(alias);
+                        if (cert == null || !(cert instanceof X509Certificate)) continue;
+                        X509Certificate candidate = (X509Certificate) cert;
+                        if (candidate.getSubjectX500Principal().equals(x509Certificate.getIssuerX500Principal())) {
+                            log.debug("Hop {}: found issuer by subject match: alias={}, subject={}", hop, alias,
+                                    candidate.getSubjectX500Principal());
+                            certificate = cert;
+                            break;
+                        }
+                    }
+                } catch (Exception e) {
+                    log.debug("Hop {}: error searching by issuer subject: {}", hop, e.getMessage());
+                }
+            }
             if (certificate == null) {
                 log.debug("Hop {}: issuer not found in keystore, chain ends", hop);
                 break;
@@ -287,10 +329,32 @@ public class TrustChainBuilder {
         log.info("Added {} certificates from CA folder", added);
     }
 
+    private static java.security.cert.Certificate findCertificateBySki(KeyStore keyStore, byte[] skiToFind) {
+        try {
+            Enumeration<String> aliases = keyStore.aliases();
+            while (aliases.hasMoreElements()) {
+                String alias = aliases.nextElement();
+                java.security.cert.Certificate cert = keyStore.getCertificate(alias);
+                if (cert == null || !(cert instanceof X509Certificate)) continue;
+                byte[] ski = getSubjectKeyIdentifier((X509Certificate) cert);
+                if (ski != null && Arrays.equals(ski, skiToFind)) {
+                    log.debug("Found cert by SKI match: alias={}, subject={}", alias,
+                            ((X509Certificate) cert).getSubjectX500Principal());
+                    return cert;
+                }
+            }
+        } catch (Exception e) {
+            log.debug("Error searching keystore by SKI: {}", e.getMessage());
+        }
+        return null;
+    }
+
     private static byte[] getSubjectKeyIdentifier(X509Certificate certificate) {
         try {
             byte[] value = certificate.getExtensionValue(Extension.subjectKeyIdentifier.getId());
-            return SubjectKeyIdentifier.getInstance(Arrays.copyOfRange(value, 2, value.length)).getKeyIdentifier();
+            return SubjectKeyIdentifier.getInstance(
+                    org.bouncycastle.asn1.ASN1OctetString.getInstance(value).getOctets()
+            ).getKeyIdentifier();
         } catch (Exception e) {
             return null;
         }

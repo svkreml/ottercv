@@ -27,6 +27,7 @@ import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.util.Arrays;
 import java.util.Date;
+import java.util.Enumeration;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -142,6 +143,57 @@ class TrustChainBuilderTest {
         return SubjectKeyIdentifier.getInstance(
                 org.bouncycastle.asn1.ASN1OctetString.getInstance(value).getOctets()
         ).getKeyIdentifier();
+    }
+
+    @Test
+    void smallInitFindsRootInCaFolderWithDifferentAlias() throws Exception {
+        Security.addProvider(new BouncyCastleProvider());
+
+        KeyPairGenerator keyGen = KeyPairGenerator.getInstance("RSA", "BC");
+        keyGen.initialize(2048);
+
+        KeyPair rootKP = keyGen.generateKeyPair();
+        X500Name rootDn = new X500Name("CN=Root Test CA, O=Test, C=RU");
+        X509Certificate rootCert = generateCACert(rootDn, rootKP, rootDn);
+
+        KeyPair interKP = keyGen.generateKeyPair();
+        X500Name interDn = new X500Name("CN=Intermediate Test CA, O=Test, C=RU");
+        X509Certificate interCert = generateCACert(interDn, interKP, rootDn, rootKP.getPublic());
+
+        KeyPair leafKP = keyGen.generateKeyPair();
+        X500Name leafDn = new X500Name("CN=Leaf Test Cert, O=Test, C=RU");
+        X509Certificate leafCert = generateEndEntityCert(leafDn, leafKP, interDn, interKP.getPublic());
+
+        KeyStore bks = KeyStore.getInstance("BKS", "BC");
+        bks.load(null, "cgvybtunm,ovgcfre".toCharArray());
+
+        byte[] rootSki = getSki(rootCert);
+        byte[] interSki = getSki(interCert);
+
+        bks.setCertificateEntry(Hex.toHexString(interSki), interCert);
+
+        String caFolderAlias = CustomBCStyle.INSTANCE.toString(
+                org.bouncycastle.asn1.x500.X500Name.getInstance(rootCert.getSubjectX500Principal().getEncoded()))
+                + " " + Hex.toHexString(rootSki);
+        bks.setCertificateEntry(caFolderAlias, rootCert);
+
+        byte[] keyBytes = ("" + System.currentTimeMillis()).getBytes();
+        SecretKeySpec secretKey = new SecretKeySpec(keyBytes, "AES");
+        bks.setEntry("info", new KeyStore.SecretKeyEntry(secretKey),
+                new KeyStore.PasswordProtection("creation date".toCharArray()));
+
+        File tempBks = File.createTempFile("test-tsl-ca", ".bks");
+        tempBks.deleteOnExit();
+        bks.store(new FileOutputStream(tempBks), "cgvybtunm,ovgcfre".toCharArray());
+
+        Localization localization = new Localization();
+        localization.TSL_LOCATION_BKS = tempBks.getAbsolutePath();
+
+        Set<X509Certificate> chain = TrustChainBuilder.smallInit(localization, leafCert);
+
+        assertThat(chain).hasSize(2);
+        assertThat(chain).extracting(X509Certificate::getSubjectX500Principal)
+                .containsExactlyInAnyOrder(interCert.getSubjectX500Principal(), rootCert.getSubjectX500Principal());
     }
 
     @Test

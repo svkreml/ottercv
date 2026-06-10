@@ -16,6 +16,7 @@ public class CustomBCStyle
         extends AbstractX500NameStyle {
     //Gost
     public static final ASN1ObjectIdentifier INN = (new ASN1ObjectIdentifier("1.2.643.3.131.1.1")).intern();
+    public static final ASN1ObjectIdentifier INNLE = (new ASN1ObjectIdentifier("1.2.643.100.4")).intern();
     public static final ASN1ObjectIdentifier OGRN = (new ASN1ObjectIdentifier("1.2.643.100.1")).intern();
     public static final ASN1ObjectIdentifier SNILS = (new ASN1ObjectIdentifier("1.2.643.100.3")).intern();
     public static final ASN1ObjectIdentifier ORGNIP = (new ASN1ObjectIdentifier("1.2.643.100.5")).intern();
@@ -215,6 +216,7 @@ public class CustomBCStyle
     static {
         //Gost
         DefaultSymbols.put(INN, "INN");
+        DefaultSymbols.put(INNLE, "INNLE");
         DefaultSymbols.put(OGRN, "OGRN");
         DefaultSymbols.put(SNILS, "SNILS");
         DefaultSymbols.put(ORGNIP, "ORGNIP");
@@ -255,6 +257,7 @@ public class CustomBCStyle
 
         //Gost
         DefaultLookUp.put("инн", INN);
+        DefaultLookUp.put("инн_юл", INNLE);
         DefaultLookUp.put("огрн", OGRN);
         DefaultLookUp.put("снилс", SNILS);
         DefaultLookUp.put("огрнип", ORGNIP);
@@ -315,7 +318,7 @@ public class CustomBCStyle
             return new DERPrintableString(value);
         }
         //Gost
-        else if (oid.equals(INN) || oid.equals(OGRN) || oid.equals(SNILS) || oid.equals(ORGNIP)) {
+        else if (oid.equals(INNLE) ||oid.equals(INN) || oid.equals(OGRN) || oid.equals(SNILS) || oid.equals(ORGNIP)) {
             return new DERNumericString(value);
         }
         return super.encodeStringValue(oid, value);
