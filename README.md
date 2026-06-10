@@ -9,10 +9,6 @@ A JavaFX desktop application for viewing and analyzing X.509 certificates.
 
 ## Building
 
-With native packages:
-
-    mvn clean package -P native-deploy
-
 Linux AppImage (standalone, no JRE bundling):
 
     mvn clean package -P linux-appimage
@@ -21,18 +17,15 @@ Portable Linux AppImage (works on any x86_64 Linux with GLIBC >= 2.31, requires 
 
     ./build-appimage-docker.sh
 
-Without native packages (ZIP only):
+## Creating a Release
 
-    mvn clean package
+Tag and push to trigger the GitHub Actions release workflow:
+
+    git tag v1.1.1
+    git push origin v1.1.1
 
 ## Output
 
-Cross-platform ZIP (no JRE):
-
-    ottercv-distrib/target/ottercv-<version>-no-jre.zip
-
 Linux AppImage:
 
-    ottercv-client/target/ottercv-<version>-x86_64.AppImage
-
-Native installers are generated in `ottercv-client/target/`.
+    target/ottercv-<version>-x86_64.AppImage

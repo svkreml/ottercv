@@ -1,11 +1,13 @@
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>svkreml.ottercv</groupId>
     <artifactId>ottercv</artifactId>
     <version>1.1.1</version>
-    <packaging>pom</packaging>
+    <packaging>jar</packaging>
     <name>Otter Certificate Viewer</name>
     <organization>
         <name>svkreml</name>
@@ -24,8 +26,6 @@
         <project.build.javaVersion>21</project.build.javaVersion>
 
         <build-helper-maven-plugin.version>3.6.0</build-helper-maven-plugin.version>
-        <copy-rename-maven-plugin.version>1.0.1</copy-rename-maven-plugin.version>
-        <javapackager.version>1.7.5</javapackager.version>
         <maven-assembly-plugin.version>3.7.1</maven-assembly-plugin.version>
         <maven-compiler-plugin.version>3.13.0</maven-compiler-plugin.version>
         <maven-dependency-plugin.version>3.7.1</maven-dependency-plugin.version>
@@ -35,14 +35,11 @@
         <!-- Logging -->
         <logback.version>1.5.6</logback.version>
         <sl4j.version>2.0.13</sl4j.version>
+        <lombok.version>1.18.34</lombok.version>
     </properties>
 
-    <modules>
-        <module>ottercv-client</module>
-        <module>ottercv-distrib</module>
-    </modules>
-
     <build>
+        <finalName>${app.finalName}-${project.version}</finalName>
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -52,7 +49,104 @@
                     <source>${project.build.javaVersion}</source>
                     <target>${project.build.javaVersion}</target>
                     <encoding>${project.build.sourceEncoding}</encoding>
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                            <version>${lombok.version}</version>
+                        </path>
+                    </annotationProcessorPaths>
                 </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <version>${maven-dependency-plugin.version}</version>
+                <executions>
+                    <execution>
+                        <id>build-manifest-classpath</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>build-classpath</goal>
+                        </goals>
+                        <configuration>
+                            <includeScope>runtime</includeScope>
+                            <fileSeparator>/</fileSeparator>
+                            <outputProperty>manifest.dependency.classpath</outputProperty>
+                            <prefix>${app.dependencyDirectory}</prefix>
+                            <pathSeparator>;</pathSeparator>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>build-helper-maven-plugin</artifactId>
+                <version>${build-helper-maven-plugin.version}</version>
+                <executions>
+                    <execution>
+                        <id>regex-property</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>regex-property</goal>
+                        </goals>
+                        <configuration>
+                            <name>manifest.dependency.replaced.classpath</name>
+                            <value>${manifest.dependency.classpath}</value>
+                            <regex>;</regex>
+                            <replacement xml:space="preserve"> </replacement>
+                            <failIfNoMatch>false</failIfNoMatch>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <version>${maven-jar-plugin.version}</version>
+                <configuration>
+                    <archive>
+                        <addMavenDescriptor>false</addMavenDescriptor>
+                        <manifest>
+                            <mainClass>${app.mainClass}</mainClass>
+                        </manifest>
+                        <manifestEntries>
+                            <Built-By>${project.organization.name}</Built-By>
+                            <Class-Path>${manifest.dependency.replaced.classpath}</Class-Path>
+                        </manifestEntries>
+                    </archive>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>3.2.5</version>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-resources-plugin</artifactId>
+                <version>${maven-resources-plugin.version}</version>
+                <executions>
+                    <execution>
+                        <id>copy-license</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>copy-resources</goal>
+                        </goals>
+                        <configuration>
+                            <outputDirectory>${project.basedir}/target</outputDirectory>
+                            <resources>
+                                <resource>
+                                    <directory>${project.basedir}</directory>
+                                    <filtering>true</filtering>
+                                    <includes>
+                                        <include>license.txt</include>
+                                    </includes>
+                                </resource>
+                            </resources>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>
@@ -75,6 +169,217 @@
                 <artifactId>jul-to-slf4j</artifactId>
                 <version>${sl4j.version}</version>
             </dependency>
+            <dependency>
+                <groupId>org.projectlombok</groupId>
+                <artifactId>lombok</artifactId>
+                <version>${lombok.version}</version>
+                <scope>provided</scope>
+            </dependency>
         </dependencies>
     </dependencyManagement>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-graphics</artifactId>
+            <version>21</version>
+            <classifier>linux</classifier>
+        </dependency>
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-controls</artifactId>
+            <version>21</version>
+            <classifier>linux</classifier>
+        </dependency>
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-base</artifactId>
+            <version>21</version>
+            <classifier>linux</classifier>
+        </dependency>
+        <dependency>
+            <groupId>jakarta.xml.bind</groupId>
+            <artifactId>jakarta.xml.bind-api</artifactId>
+            <version>4.0.2</version>
+        </dependency>
+        <dependency>
+            <groupId>com.sun.xml.bind</groupId>
+            <artifactId>jaxb-impl</artifactId>
+            <version>4.0.0</version>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.bouncycastle</groupId>
+            <artifactId>bcpkix-jdk18on</artifactId>
+            <version>1.77</version>
+        </dependency>
+
+        <!-- Test -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>5.10.2</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.assertj</groupId>
+            <artifactId>assertj-core</artifactId>
+            <version>3.26.0</version>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- Logging -->
+        <dependency>
+            <groupId>ch.qos.logback</groupId>
+            <artifactId>logback-classic</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>jcl-over-slf4j</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>jul-to-slf4j</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <scope>provided</scope>
+        </dependency>
+    </dependencies>
+
+    <profiles>
+        <profile>
+            <id>linux-appimage</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-dependency-plugin</artifactId>
+                        <version>${maven-dependency-plugin.version}</version>
+                        <executions>
+                            <execution>
+                                <id>copy-dependencies-for-appimage</id>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>copy-dependencies</goal>
+                                </goals>
+                                <configuration>
+                                    <outputDirectory>${project.build.directory}/libs</outputDirectory>
+                                    <includeScope>runtime</includeScope>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>exec-maven-plugin</artifactId>
+                        <version>3.1.0</version>
+                        <executions>
+                            <execution>
+                                <id>download-appimagetool</id>
+                                <phase>generate-resources</phase>
+                                <goals>
+                                    <goal>exec</goal>
+                                </goals>
+                                <configuration>
+                                    <executable>sh</executable>
+                                    <arguments>
+                                        <argument>-c</argument>
+                                        <argument><![CDATA[mkdir -p "${project.build.directory}" && ARCH=$(uname -m); if [ "$ARCH" = "x86_64" ]; then URL="https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage"; elif [ "$ARCH" = "aarch64" ]; then URL="https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-aarch64.AppImage"; else echo "Unsupported architecture: $ARCH"; exit 1; fi; curl -L -o "${project.build.directory}/appimagetool-${ARCH}.AppImage" "$URL" && chmod +x "${project.build.directory}/appimagetool-${ARCH}.AppImage" && cd "${project.build.directory}" && rm -rf squashfs-root && "./appimagetool-${ARCH}.AppImage" --appimage-extract]]></argument>
+                                    </arguments>
+                                </configuration>
+                            </execution>
+                            <execution>
+                                <id>make-appimage-script-executable</id>
+                                <phase>generate-resources</phase>
+                                <goals>
+                                    <goal>exec</goal>
+                                </goals>
+                                <configuration>
+                                    <executable>chmod</executable>
+                                    <arguments>
+                                        <argument>+x</argument>
+                                        <argument>${project.basedir}/appimage/build-appimage.sh</argument>
+                                    </arguments>
+                                </configuration>
+                            </execution>
+                            <execution>
+                                <id>build-jre</id>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>exec</goal>
+                                </goals>
+                                <configuration>
+                                    <executable>sh</executable>
+                                    <arguments>
+                                        <argument>-c</argument>
+                                        <argument><![CDATA[${env.JAVA_HOME}/bin/jlink --module-path ${env.JAVA_HOME}/jmods --add-modules java.base,java.desktop,java.logging,java.xml,java.sql,java.naming,java.compiler,jdk.unsupported --output ${project.build.directory}/jre --no-header-files --no-man-pages --strip-debug --compress=2]]></argument>
+                                    </arguments>
+                                </configuration>
+                            </execution>
+                            <execution>
+                                <id>build-appdir</id>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>exec</goal>
+                                </goals>
+                                <configuration>
+                                    <executable>${project.basedir}/appimage/build-appimage.sh</executable>
+                                    <arguments>
+                                        <argument>${project.build.directory}</argument>
+                                        <argument>${project.build.directory}/OtterCV.AppDir</argument>
+                                        <argument>${project.basedir}/assets</argument>
+                                        <argument>${project.build.directory}/jre</argument>
+                                    </arguments>
+                                </configuration>
+                            </execution>
+                            <execution>
+                                <id>create-appimage</id>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>exec</goal>
+                                </goals>
+                                <configuration>
+                                    <executable>sh</executable>
+                                    <arguments>
+                                        <argument>-c</argument>
+                                        <argument><![CDATA["${project.build.directory}/squashfs-root/AppRun" "${project.build.directory}/OtterCV.AppDir" "${project.build.directory}/ottercv-${project.version}-$(uname -m).AppImage"]]></argument>
+                                    </arguments>
+                                </configuration>
+                            </execution>
+                            <execution>
+                                <id>cleanup-appimagetool</id>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>exec</goal>
+                                </goals>
+                                <configuration>
+                                    <executable>rm</executable>
+                                    <arguments>
+                                        <argument>-rf</argument>
+                                        <argument>${project.build.directory}/squashfs-root</argument>
+                                    </arguments>
+                                </configuration>
+                            </execution>
+                            <execution>
+                                <id>test-appimage</id>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>exec</goal>
+                                </goals>
+                                <configuration>
+                                    <executable>sh</executable>
+                                    <arguments>
+                                        <argument>-c</argument>
+                                        <argument><![CDATA[if [ "${AI_TEST}" = "true" ]; then chmod +x "${project.build.directory}/ottercv-${project.version}-$(uname -m).AppImage" && cd "${project.build.directory}" && "./ottercv-${project.version}-$(uname -m).AppImage" --appimage-extract && timeout 10 xvfb-run "./squashfs-root/AppRun" || true; rm -rf squashfs-root; fi]]></argument>
+                                    </arguments>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 </project>

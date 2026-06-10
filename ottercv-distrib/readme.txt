@@ -1,1 +1,0 @@
-Java Multiplatform Distribution

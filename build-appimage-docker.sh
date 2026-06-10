@@ -19,4 +19,4 @@ docker run --rm --name "$CONTAINER_NAME" \
 
 echo ""
 echo "AppImage built successfully:"
-ls -lh "$SCRIPT_DIR"/ottercv-client/target/*.AppImage 2>/dev/null || true
+ls -lh "$SCRIPT_DIR"/target/*.AppImage 2>/dev/null || true
