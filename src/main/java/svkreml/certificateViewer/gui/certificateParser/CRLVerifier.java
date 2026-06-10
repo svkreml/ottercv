@@ -1,4 +1,4 @@
-package svkreml.certificateViewer.gui.certificateParser.chainBuilder;
+package svkreml.certificateViewer.gui.certificateParser;
 
 import lombok.extern.slf4j.Slf4j;
 import org.bouncycastle.asn1.ASN1InputStream;

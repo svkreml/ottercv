@@ -11,7 +11,7 @@ import java.security.Security;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 
-import svkreml.certificateViewer.gui.certificateParser.chainBuilder.CertificateVerifier;
+import svkreml.certificateViewer.gui.certificateParser.CertificateVerifier;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

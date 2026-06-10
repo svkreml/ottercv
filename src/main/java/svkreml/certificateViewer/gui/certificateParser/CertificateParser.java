@@ -16,7 +16,7 @@ import org.bouncycastle.util.io.Streams;
 import svkreml.certificateViewer.gui.api.model.CertificateModel;
 import svkreml.certificateViewer.gui.api.model.CertificateStatus;
 import svkreml.certificateViewer.gui.api.model.DetailType;
-import svkreml.certificateViewer.gui.certificateParser.chainBuilder.CertificateVerifier;
+import svkreml.certificateViewer.gui.certificateParser.CertificateVerifier;
 import svkreml.certificateViewer.gui.localization.ru.Localization;
 import svkreml.certificateViewer.gui.view.utils.Utils;
 import svkreml.certificateViewer.gui.view.utils.WebUtils;
@@ -211,6 +211,8 @@ public class CertificateParser {
         private CertificateStatus certificateStatus;
         private ArrayList<CertificateModel.CertificateChain> certificateChains;
 
+        private static final CertificateChainValidator chainValidator = new CertificateChainValidator();
+
         public Validate(Localization localization, X509CertificateHolder x509CertificateHolder) {
             this.localization = localization;
             this.x509CertificateHolder = x509CertificateHolder;
@@ -240,8 +242,8 @@ public class CertificateParser {
                 for (java.security.cert.Certificate c : verifiedCertChain.getCertPath().getCertificates()) {
                     X509Certificate xc = (X509Certificate) c;
                     log.debug("Checking chain cert subject={}, isFromCaFolder={}",
-                            xc.getSubjectX500Principal(), TrustChainBuilder.isFromCaFolder(xc));
-                    if (TrustChainBuilder.isFromCaFolder(xc)) {
+                            xc.getSubjectX500Principal(), chainValidator.isFromCaFolder(xc));
+                    if (chainValidator.isFromCaFolder(xc)) {
                         trustedViaCaFolder = true;
                         break;
                     }
@@ -249,8 +251,8 @@ public class CertificateParser {
                 if (!trustedViaCaFolder && verifiedCertChain.getTrustAnchor() != null) {
                     X509Certificate ta = verifiedCertChain.getTrustAnchor().getTrustedCert();
                     log.debug("Checking trust anchor subject={}, isFromCaFolder={}",
-                            ta.getSubjectX500Principal(), TrustChainBuilder.isFromCaFolder(ta));
-                    trustedViaCaFolder = TrustChainBuilder.isFromCaFolder(ta);
+                            ta.getSubjectX500Principal(), chainValidator.isFromCaFolder(ta));
+                    trustedViaCaFolder = chainValidator.isFromCaFolder(ta);
                 }
 
                 String statusMsg = trustedViaCaFolder ? Messages.CERTIFICATE_TRUSTED_VIA_CA_FOLDER : Messages.CERTIFICATE_IN_TSL;
@@ -284,7 +286,8 @@ public class CertificateParser {
             Set<X509Certificate> gostTlsStore;
             try {
                 log.debug("Building trust chain for cert subject={}", x509CertificateHolder.getSubject());
-                gostTlsStore = TrustChainBuilder.smallInit(localization, x509CertificateHolder);
+                gostTlsStore = chainValidator.buildChain(localization,
+                        KeyParser.loadCertificate(x509CertificateHolder.getEncoded()));
                 log.info("Trust chain built, size={}", gostTlsStore.size());
             } catch (Exception e) {
                 log.error("Failed to initialize trust chain builder", e);

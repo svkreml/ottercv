@@ -1,5 +1,4 @@
-package svkreml.certificateViewer.gui.certificateParser.chainBuilder;
-
+package svkreml.certificateViewer.gui.certificateParser;
 
 public class CertificateVerificationException extends Exception {
     private static final long serialVersionUID = 1L;

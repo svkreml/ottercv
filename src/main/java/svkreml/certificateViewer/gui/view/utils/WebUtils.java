@@ -1,6 +1,6 @@
 package svkreml.certificateViewer.gui.view.utils;
 
-import svkreml.certificateViewer.gui.certificateParser.chainBuilder.CertificateVerificationException;
+import svkreml.certificateViewer.gui.certificateParser.CertificateVerificationException;
 
 import javax.naming.Context;
 import javax.naming.NamingException;
