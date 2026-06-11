@@ -15,8 +15,6 @@ import java.util.Base64;
 
 public class TabChain {
 
-    static CertificateModel.CertificateChain selectedCert = null;
-
     public static Tab create(Localization localization, CertificateModel certificateModel) {
         AnchorPane localRoot = new AnchorPane();
         Tab tabGeneral = new Tab(localization.TAB_CHAIN_TITLE, localRoot);
@@ -33,47 +31,36 @@ public class TabChain {
 
             @Override
             public void updateItem(CertificateModel.CertificateChain item, boolean empty) {
-                if (item != null) {
-                    HBox box = new HBox();
-                    box.setSpacing(5);
-                    Circle circle = new Circle(7);
-                    switch (item.certificateStatus) {
-                        case TRUSTED:
-                            circle.setFill(Color.GREEN);
-                            break;
-                        case UNTRUSTED_ROOT:
-                        case UNTRUSTED_CHAIN:
-                        case BROKEN:
-                        case OVERDUE:
-                            circle.setFill(Color.RED);
-                            break;
-                        case UNKNOWN:
-                            circle.setFill(Color.GRAY);
-                            break;
-                    }
-                    box.getChildren().addAll(circle, new Label(item.getCn()));
-                    setGraphic(box);
-
-                }
                 super.updateItem(item, empty);
+                if (item == null || empty) {
+                    setGraphic(null);
+                    return;
+                }
+                HBox box = new HBox();
+                box.setSpacing(5);
+                Circle circle = new Circle(7);
+                switch (item.certificateStatus) {
+                    case TRUSTED -> circle.setFill(Color.GREEN);
+                    case UNTRUSTED_ROOT, UNTRUSTED_CHAIN, BROKEN, OVERDUE -> circle.setFill(Color.RED);
+                    case UNKNOWN -> circle.setFill(Color.GRAY);
+                }
+                box.getChildren().addAll(circle, new Label(item.getCn()));
+                setGraphic(box);
             }
         });
 
         chainTree.setEditable(false);
         chainTree.setOnMouseClicked((e) -> {
-            try {
-                TreeItem<CertificateModel.CertificateChain>
-                        selectedItem =
-                        chainTree.getSelectionModel().getSelectedItem();
-                selectedCert = selectedItem.getValue();
-                certStatusTextArea.setText(
-                        localization.nameCertificateStatus(selectedItem.getValue().certificateStatus)
-                );
-                certStatusTextArea.appendText("\n----------------------------------------------\n");
-                for (String s : selectedItem.getValue().getList()) {
-                    certStatusTextArea.appendText(s + "\n");
-                }
-            } catch (NullPointerException ignored) {
+            TreeItem<CertificateModel.CertificateChain> selectedItem =
+                    chainTree.getSelectionModel().getSelectedItem();
+            if (selectedItem == null || selectedItem.getValue() == null) return;
+            CertificateModel.CertificateChain selectedCert = selectedItem.getValue();
+            certStatusTextArea.setText(
+                    localization.nameCertificateStatus(selectedCert.certificateStatus)
+            );
+            certStatusTextArea.appendText("\n----------------------------------------------\n");
+            for (String s : selectedCert.getList()) {
+                certStatusTextArea.appendText(s + "\n");
             }
         });
 
@@ -111,8 +98,12 @@ public class TabChain {
         FxUtils.setAnchorPaneBorders(button, null, null, 5.0, 10.0);
         button.setCancelButton(true);
         button.setOnMouseClicked((e) -> {
-            if (selectedCert != null) {
+            var treeView = (TreeView<?>) rootPane.lookup("TreeView");
+            @SuppressWarnings("unchecked")
+            TreeItem<CertificateModel.CertificateChain> selected = (TreeItem<CertificateModel.CertificateChain>) treeView.getSelectionModel().getSelectedItem();
+            if (selected != null && selected.getValue() != null) {
                 try {
+                    CertificateModel.CertificateChain selectedCert = selected.getValue();
                     Alerts.showBigAlert(
                             "-----BEGIN CERTIFICATE-----\n" +
                                     Base64.getMimeEncoder()

@@ -1,5 +1,7 @@
 package svkreml.certificateViewer.gui.view.utils;
 
+import lombok.Cleanup;
+import lombok.experimental.UtilityClass;
 import svkreml.certificateViewer.gui.certificateParser.CertificateVerificationException;
 
 import javax.naming.Context;
@@ -12,17 +14,21 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
-import java.net.URL;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.util.Hashtable;
 
+@UtilityClass
 public class WebUtils {
-    public static InputStream download(String crlURL) throws IOException,
 
+    private final HttpClient HTTP_CLIENT = HttpClient.newHttpClient();
+
+    public static InputStream download(String crlURL) throws IOException,
             CertificateVerificationException, NamingException {
         if (crlURL.startsWith("http://") || crlURL.startsWith("https://")
                 || crlURL.startsWith("ftp://")) {
             return downloadFromWeb(crlURL);
-
         } else if (crlURL.startsWith("ldap://")) {
             return downloadFromLDAP(crlURL);
         } else {
@@ -33,27 +39,34 @@ public class WebUtils {
     }
 
     private static InputStream downloadFromLDAP(String ldapURL)
-            throws NamingException {
-        Hashtable<String, String> env = new Hashtable<String, String>();
+            throws NamingException, CertificateVerificationException {
+        var env = new Hashtable<String, String>();
         env.put(Context.INITIAL_CONTEXT_FACTORY,
                 "com.sun.jndi.ldap.LdapCtxFactory");
         env.put(Context.PROVIDER_URL, ldapURL);
 
-        DirContext ctx = new InitialDirContext(env);
+        @Cleanup DirContext ctx = new InitialDirContext(env);
         Attributes avals = ctx.getAttributes("");
         Attribute aval = avals.get("certificateRevocationList;binary");
         byte[] val = (byte[]) aval.get();
-        if ((val == null) || (val.length == 0)) {
-            throw new NullPointerException(
+        if (val == null || val.length == 0) {
+            throw new CertificateVerificationException(
                     "Can not download CRL from: " + ldapURL);
-        } else {
-            return new ByteArrayInputStream(val);
         }
+        return new ByteArrayInputStream(val);
     }
 
     private static InputStream downloadFromWeb(String crlURL)
             throws IOException {
-        URL url = URI.create(crlURL).toURL();
-        return url.openStream();
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(crlURL))
+                .GET()
+                .build();
+        try {
+            return HTTP_CLIENT.send(request, HttpResponse.BodyHandlers.ofInputStream()).body();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IOException("Request interrupted for " + crlURL, e);
+        }
     }
 }

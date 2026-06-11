@@ -1,11 +1,13 @@
 package svkreml.certificateViewer.gui.view.utils;
 
+import lombok.experimental.UtilityClass;
 import javafx.scene.Node;
 import javafx.scene.control.Label;
 import javafx.scene.layout.AnchorPane;
 import javafx.scene.layout.Pane;
 import javafx.scene.text.TextAlignment;
 
+@UtilityClass
 public class FxUtils {
 
     public static void createLabel(Pane generalPane, String s, double top, double left) {

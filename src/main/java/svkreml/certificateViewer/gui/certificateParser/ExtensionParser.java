@@ -1,5 +1,6 @@
 package svkreml.certificateViewer.gui.certificateParser;
 
+import lombok.experimental.UtilityClass;
 import org.bouncycastle.asn1.*;
 import org.bouncycastle.asn1.x500.RDN;
 import org.bouncycastle.asn1.x500.X500Name;
@@ -13,26 +14,43 @@ import java.text.ParseException;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+@UtilityClass
 public class ExtensionParser {
+
+    private static final String OID_SUBJECT_SIGNATURE_TOOL = "1.2.643.100.111";
+    private static final String ENTRY_SEPARATOR = "; ";
+    private static final int ISSUER_SIGNATURE_TOOL_PARTS = 4;
+    private static final String OID_ISSUER_SIGNATURE_TOOL = "1.2.643.100.112";
+    private static final String OID_SUBJECT_KEY_IDENTIFIER = "2.5.29.14";
+    private static final String OID_KEY_USAGE = "2.5.29.15";
+    private static final String OID_PRIVATE_KEY_USAGE_PERIOD = "2.5.29.16";
+    private static final String OID_SUBJECT_ALTERNATIVE_NAME = "2.5.29.17";
+    private static final String OID_BASIC_CONSTRAINTS = "2.5.29.19";
+    private static final String OID_CRL_DISTRIBUTION_POINTS = "2.5.29.31";
+    private static final String OID_CERTIFICATE_POLICIES = "2.5.29.32";
+    private static final String OID_AUTHORITY_KEY_IDENTIFIER = "2.5.29.35";
+    private static final String OID_EXTENDED_KEY_USAGE = "2.5.29.37";
+    private static final String OID_ENHANCED_KEY_USAGE = "1.3.6.1.4.1.311.21.10";
+    private static final String OID_AUTHORITY_INFORMATION_ACCESS = "1.3.6.1.5.5.7.1.1";
 
     public static CertificateModel.CertificateDetail parseExtension(Localization localization, Extension extension)
             throws ParseException {
         StringBuilder parsedAsn1Ext = new StringBuilder();
 
         switch (extension.getExtnId().getId()) {
-            case "1.2.643.100.111" -> parseSubjectSignatureTool(extension, parsedAsn1Ext);
-            case "1.2.643.100.112" -> parseIssuerSignatureTool(localization, extension, parsedAsn1Ext);
-            case "2.5.29.14" -> parseSubjectKeyIdentifier(localization, extension, parsedAsn1Ext);
-            case "2.5.29.15" -> parseKeyUsage(localization, extension, parsedAsn1Ext);
-            case "2.5.29.16" -> parsePrivateKeyUsagePeriod(localization, extension, parsedAsn1Ext);
-            case "2.5.29.17" -> parseSubjectAlternativeName(localization, extension, parsedAsn1Ext);
-            case "2.5.29.19" -> parseBasicConstraints(localization, extension, parsedAsn1Ext);
-            case "2.5.29.31" -> parseCertificateRevocationList(localization, extension, parsedAsn1Ext);
-            case "2.5.29.32" -> parseCertificatePolices(localization, extension, parsedAsn1Ext);
-            case "2.5.29.35" -> parseAuthorityKeyIdentifier(localization, extension, parsedAsn1Ext);
-            case "2.5.29.37" -> parseExtendedKeyUsage(localization, extension, parsedAsn1Ext);
-            case "1.3.6.1.4.1.311.21.10" -> parseEnhancedKeyUsage(localization, extension, parsedAsn1Ext);
-            case "1.3.6.1.5.5.7.1.1" -> parseAuthorityInformationAccess(localization, extension, parsedAsn1Ext);
+            case OID_SUBJECT_SIGNATURE_TOOL -> parseSubjectSignatureTool(extension, parsedAsn1Ext);
+            case OID_ISSUER_SIGNATURE_TOOL -> parseIssuerSignatureTool(localization, extension, parsedAsn1Ext);
+            case OID_SUBJECT_KEY_IDENTIFIER -> parseSubjectKeyIdentifier(localization, extension, parsedAsn1Ext);
+            case OID_KEY_USAGE -> parseKeyUsage(localization, extension, parsedAsn1Ext);
+            case OID_PRIVATE_KEY_USAGE_PERIOD -> parsePrivateKeyUsagePeriod(localization, extension, parsedAsn1Ext);
+            case OID_SUBJECT_ALTERNATIVE_NAME -> parseSubjectAlternativeName(localization, extension, parsedAsn1Ext);
+            case OID_BASIC_CONSTRAINTS -> parseBasicConstraints(localization, extension, parsedAsn1Ext);
+            case OID_CRL_DISTRIBUTION_POINTS -> parseCertificateRevocationList(localization, extension, parsedAsn1Ext);
+            case OID_CERTIFICATE_POLICIES -> parseCertificatePolices(localization, extension, parsedAsn1Ext);
+            case OID_AUTHORITY_KEY_IDENTIFIER -> parseAuthorityKeyIdentifier(localization, extension, parsedAsn1Ext);
+            case OID_EXTENDED_KEY_USAGE -> parseExtendedKeyUsage(localization, extension, parsedAsn1Ext);
+            case OID_ENHANCED_KEY_USAGE -> parseEnhancedKeyUsage(localization, extension, parsedAsn1Ext);
+            case OID_AUTHORITY_INFORMATION_ACCESS -> parseAuthorityInformationAccess(localization, extension, parsedAsn1Ext);
             default -> parsedAsn1Ext = new StringBuilder(extension.getParsedValue().toString());
         }
 
@@ -49,7 +67,7 @@ public class ExtensionParser {
         for (ASN1Encodable asn1Encodable : ((ASN1Sequence) extension.getParsedValue()).toArray()) {
             for (ASN1Encodable encodable : ((ASN1Sequence) asn1Encodable).toArray()) {
                 parsedAsn1Ext.append(localization.convertOidToString((ASN1ObjectIdentifier) encodable, ""))
-                        .append("(").append(encodable).append("); ");
+                        .append("(").append(encodable).append(")").append(ENTRY_SEPARATOR);
             }
             parsedAsn1Ext.append('\n');
         }
@@ -63,15 +81,15 @@ public class ExtensionParser {
         GeneralName[] names = instance.getNames();
         for (GeneralName name : names) {
             parsedAsn1Ext.append(convertGeneralNameTag(name.getTagNo()))
-                    .append(" : ")
+                    .append(": ")
                     .append(name.getName().toString())
                     .append('\n');
         }
 
     }
 
-    private static String convertGeneralNameTag(int i) {
-        return switch (i) {
+    private static String convertGeneralNameTag(int tagNo) {
+        return switch (tagNo) {
             case GeneralName.otherName -> "otherName";
             case GeneralName.rfc822Name -> "rfc822Name";
             case GeneralName.dNSName -> "dNSName";
@@ -81,7 +99,7 @@ public class ExtensionParser {
             case GeneralName.uniformResourceIdentifier -> "uniformResourceIdentifier";
             case GeneralName.iPAddress -> "iPAddress";
             case GeneralName.registeredID -> "registeredID";
-            default -> i + "";
+            default -> String.valueOf(tagNo);
         };
     }
 
@@ -130,24 +148,7 @@ public class ExtensionParser {
                                                        StringBuilder parsedAsn1Ext) {
         CRLDistPoint crlDistPoint = CRLDistPoint.getInstance(extension.getParsedValue());
         parsedAsn1Ext.append(crlDistPoint.toString()
-                .replaceAll("([\\n\\r\\]]){4,}", "\n]]\n")); //FIXME распарсить все варианты
-   /*     //List<String> crlUrls = new ArrayList<String>();
-        for (DistributionPoint dp : crlDistPoint.getDistributionPoints()) {
-            DistributionPointName dpn = dp.getDistributionPoint();
-            // Look for URIs in fullName
-            if (dpn != null) {
-                if (dpn.getType() == DistributionPointName.FULL_NAME) {
-                    GeneralName[] genNames = GeneralNames.getInstance(dpn.getName()).getNames();
-                    // Look for an URI
-                    for (GeneralName genName : genNames) {
-                        if (genName.getTagNo() == GeneralName.uniformResourceIdentifier) {
-                            String url = DERIA5String.getInstance(genName.getName()).getString();
-                            parsedAsn1Ext.append(url).append("\n");
-                        }
-                    }
-                }
-            }
-        }*/
+                .replaceAll("([\\n\\r\\]]){4,}", "\n]]\n"));
     }
 
     private static void parsePrivateKeyUsagePeriod(Localization localization,
@@ -187,7 +188,7 @@ public class ExtensionParser {
 
         ASN1Encodable[] instance = BERSequence.getInstance(DEROctetString.
                 getInstance(extension.getExtnValue()).getOctets()).toArray();
-        if (instance.length == 4) {
+        if (instance.length == ISSUER_SIGNATURE_TOOL_PARTS) {
             parsedAsn1Ext.append(String.format("%15s %s", "signTool:", instance[0].toString())).append("\n");
             parsedAsn1Ext.append(String.format("%15s %s", "cATool:", instance[1].toString())).append("\n");
             parsedAsn1Ext.append(String.format("%15s %s", "signToolCert:", instance[2].toString())).append("\n");
@@ -264,13 +265,13 @@ public class ExtensionParser {
     public static Map<String, String> convert(X500Name x500Name) {
         Map<String, String> map = new LinkedHashMap<>();
         RDN[] rdNs = x500Name.getRDNs();
-        for (RDN rdN : rdNs) {
+        for (RDN rdn : rdNs) {
             String[]
                     names =
                     X500Name.getDefaultStyle()
-                            .oidToAttrNames(new ASN1ObjectIdentifier(rdN.getFirst().getType().toString()));
-            map.put(names.length > 0 ? names[0].toUpperCase() : rdN.getFirst().getType().toString(),
-                    rdN.getFirst().getValue().toString());
+                            .oidToAttrNames(new ASN1ObjectIdentifier(rdn.getFirst().getType().toString()));
+            map.put(names.length > 0 ? names[0].toUpperCase() : rdn.getFirst().getType().toString(),
+                    rdn.getFirst().getValue().toString());
         }
         return map;
     }

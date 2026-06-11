@@ -9,9 +9,11 @@ import org.bouncycastle.asn1.x500.style.AbstractX500NameStyle;
 import org.bouncycastle.asn1.x500.style.IETFUtils;
 import org.bouncycastle.asn1.x509.X509ObjectIdentifiers;
 
+import java.util.HashMap;
 import java.util.Hashtable;
+import java.util.Map;
 
-@SuppressWarnings({"WeakerAccess", "uncheked"})
+@SuppressWarnings({"WeakerAccess", "unchecked"})
 public class CustomBCStyle
         extends AbstractX500NameStyle {
     //Gost
@@ -198,16 +200,16 @@ public class CustomBCStyle
      * default look up table translating OID values into their common symbols following
      * the convention in RFC 2253 with a few extras
      */
-    public static final Hashtable<ASN1ObjectIdentifier, String>
+    public static final Map<ASN1ObjectIdentifier, String>
             DefaultSymbols =
-            new Hashtable<>();
+            new HashMap<>();
 
     /**
      * look up table translating common symbols into their OIDS.
      */
-    public static final Hashtable<String, ASN1ObjectIdentifier>
+    public static final Map<String, ASN1ObjectIdentifier>
             DefaultLookUp =
-            new Hashtable<>();
+            new HashMap<>();
     /**
      * Singleton instance.
      */
@@ -298,12 +300,19 @@ public class CustomBCStyle
         DefaultLookUp.put("organizationidentifier", ORGANIZATION_IDENTIFIER);
     }
 
+    @SuppressWarnings("rawtypes")
     protected final Hashtable defaultLookUp;
+    @SuppressWarnings("rawtypes")
     protected final Hashtable defaultSymbols;
 
     protected CustomBCStyle() {
-        defaultSymbols = copyHashTable(DefaultSymbols);
-        defaultLookUp = copyHashTable(DefaultLookUp);
+        defaultSymbols = copyHashtable(DefaultSymbols);
+        defaultLookUp = copyHashtable(DefaultLookUp);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Hashtable copyHashtable(Map source) {
+        return new Hashtable(source);
     }
 
     protected ASN1Encodable encodeStringValue(ASN1ObjectIdentifier oid,
@@ -324,22 +333,27 @@ public class CustomBCStyle
         return super.encodeStringValue(oid, value);
     }
 
+    @Override
     public String oidToDisplayName(ASN1ObjectIdentifier oid) {
         return DefaultSymbols.get(oid);
     }
 
+    @Override
     public String[] oidToAttrNames(ASN1ObjectIdentifier oid) {
         return IETFUtils.findAttrNamesForOID(oid, defaultLookUp);
     }
 
+    @Override
     public ASN1ObjectIdentifier attrNameToOID(String attrName) {
         return IETFUtils.decodeAttrName(attrName, defaultLookUp);
     }
 
+    @Override
     public RDN[] fromString(String dirName) {
         return IETFUtils.rDNsFromString(dirName, this);
     }
 
+    @Override
     public String toString(X500Name name) {
         StringBuffer buf = new StringBuffer();
         boolean first = true;

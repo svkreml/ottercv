@@ -7,7 +7,6 @@ import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.scene.layout.AnchorPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.paint.Color;
-import javafx.scene.paint.PhongMaterial;
 import javafx.scene.shape.Circle;
 import javafx.util.Pair;
 import svkreml.certificateViewer.gui.api.model.CertificateModel;
@@ -98,7 +97,6 @@ public class TabDetails {
 
         columnKey.setCellValueFactory(new PropertyValueFactory<>("fieldWithType"));
         columnKey.setMinWidth(30);
-        columnKey.setPrefWidth(80);
         columnKey.setPrefWidth(200);
         return columnKey;
     }

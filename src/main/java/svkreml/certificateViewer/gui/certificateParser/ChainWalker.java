@@ -6,7 +6,6 @@ import org.bouncycastle.util.encoders.Hex;
 import java.security.KeyStore;
 import java.security.cert.X509Certificate;
 import java.util.*;
-import java.util.stream.Collectors;
 
 /**
  * Walks the certificate chain from a leaf cert toward a root using AKI/SKI matching.
@@ -30,7 +29,7 @@ public class ChainWalker {
      * @return ordered set of chain certificates (excluding the leaf itself),
      *         from issuer closest to leaf to root; empty if no chain found
      */
-    public Set<X509Certificate> buildChain(KeyStore keystore, X509Certificate leafCert) {
+    public Set<X509Certificate> buildChain(KeyStore keystore, @lombok.NonNull X509Certificate leafCert) {
         LinkedHashSet<X509Certificate> chain = new LinkedHashSet<>();
         log.debug("buildChain for cert subject={}", leafCert.getSubjectX500Principal());
 
@@ -58,7 +57,11 @@ public class ChainWalker {
         Set<String> visited = new HashSet<>();
         int hop = 0;
 
-        while (currentAki != null) {
+        while (true) {
+            if (hop >= 100) {
+                log.warn("Hop limit (100) reached — possible infinite loop, aborting chain walk");
+                break;
+            }
             hop++;
             String akiHex = Hex.toHexString(currentAki);
 
@@ -77,6 +80,10 @@ public class ChainWalker {
             }
 
             X509Certificate parentCert = pickOne(parentCandidates, currentCert);
+            if (parentCert == null) {
+                log.warn("Hop {}: pickOne returned null (non-empty input) — aborting chain", hop);
+                break;
+            }
             chain.add(parentCert);
             log.debug("Hop {}: picked parent: subject={}, selfSigned={}", hop,
                     parentCert.getSubjectX500Principal(), CertUtils.isSelfSigned(parentCert));
@@ -122,13 +129,13 @@ public class ChainWalker {
      */
     private X509Certificate pickOne(List<X509Certificate> candidates, X509Certificate childCert) {
         if (candidates.isEmpty()) return null;
-        if (candidates.size() == 1) return candidates.get(0);
+        if (candidates.size() == 1) return candidates.getFirst();
 
         log.debug("pickOne: {} candidates with same SKI, disambiguating", candidates.size());
 
         List<X509Certificate> issuerMatch = candidates.stream()
                 .filter(c -> c.getSubjectX500Principal().equals(childCert.getIssuerX500Principal()))
-                .collect(Collectors.toList());
+                .toList();
 
         List<X509Certificate> pool;
         if (!issuerMatch.isEmpty()) {
@@ -142,14 +149,14 @@ public class ChainWalker {
         if (pool.size() > 1) {
             List<X509Certificate> selfSigned = pool.stream()
                     .filter(CertUtils::isSelfSigned)
-                    .collect(Collectors.toList());
+                    .toList();
             if (!selfSigned.isEmpty()) {
                 log.debug("pickOne: preferring self-signed ({} of {})", selfSigned.size(), pool.size());
                 pool = selfSigned;
             }
         }
 
-        X509Certificate chosen = pool.get(0);
+        X509Certificate chosen = pool.getFirst();
         log.debug("pickOne: chosen subject={}, selfSigned={}", chosen.getSubjectX500Principal(), CertUtils.isSelfSigned(chosen));
         return chosen;
     }

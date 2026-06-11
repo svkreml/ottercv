@@ -15,6 +15,7 @@ import java.io.InputStream;
 import java.security.PublicKey;
 import java.security.cert.Certificate;
 import java.security.cert.*;
+import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -31,12 +32,10 @@ import java.util.concurrent.ConcurrentHashMap;
  * {@code nextUpdate} time passes.
  */
 @Slf4j
-public final class CRLVerifier {
+@lombok.experimental.UtilityClass
+public class CRLVerifier {
 
-    private static final Map<X509Certificate, X509CRL> cachedCrl = new ConcurrentHashMap<>();
-
-    private CRLVerifier() {
-    }
+    private final Map<X509Certificate, X509CRL> CACHED_CRL = new ConcurrentHashMap<>();
 
     /**
      * Verifies that the given certificate has not been revoked according to its CRL.
@@ -51,12 +50,12 @@ public final class CRLVerifier {
     public static void verifyCertificateCRLs(X509Certificate cert, PKIXCertPathBuilderResult verifiedCertChain)
             throws CertificateVerificationException {
         try {
-            X509CRL crl = cachedCrl.get(cert);
+            X509CRL crl = CACHED_CRL.get(cert);
             log.debug("CRL check for cert subject={}, cached={}, nextUpdate={}",
                     cert.getSubjectX500Principal(),
                     crl != null,
                     crl != null ? crl.getNextUpdate() : "null");
-            if (crl == null || crl.getNextUpdate().before(new Date())) {
+            if (crl == null || crl.getNextUpdate().toInstant().isBefore(Instant.now())) {
                 List<String> crlDistPoints = getCrlDistributionPoints(cert);
                 log.debug("CRL distribution points: {}", crlDistPoints);
                 for (String crlDP : crlDistPoints) {
@@ -76,7 +75,7 @@ public final class CRLVerifier {
                         log.debug("CRL will be verified with key from: {}",
                                 certificates.size() <= 1 ? "trust anchor" : "last chain cert");
                         crl.verify(verifierKey, "BC");
-                        cachedCrl.putIfAbsent(cert, crl);
+                        CACHED_CRL.putIfAbsent(cert, crl);
                         break;
                     } catch (Exception e) {
                         log.error("Failed to download/verify CRL from {}: {}", crlDP, e.getMessage(), e);

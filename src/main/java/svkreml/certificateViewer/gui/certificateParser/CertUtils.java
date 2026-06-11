@@ -1,5 +1,6 @@
 package svkreml.certificateViewer.gui.certificateParser;
 
+import lombok.experimental.UtilityClass;
 import org.bouncycastle.asn1.x509.AuthorityKeyIdentifier;
 import org.bouncycastle.asn1.x509.Extension;
 import org.bouncycastle.asn1.x509.SubjectKeyIdentifier;
@@ -15,10 +16,8 @@ import java.security.cert.X509Certificate;
  * computing fingerprints, and detecting self-signed certificates.
  * All methods are null-safe and return {@code null} on parse failure.
  */
-public final class CertUtils {
-
-    private CertUtils() {
-    }
+@UtilityClass
+public class CertUtils {
 
     /**
      * Extracts the Subject Key Identifier (SKI) from a certificate's extensions.

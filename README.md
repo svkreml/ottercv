@@ -61,25 +61,27 @@ CertificateParser.Validate.invoke()
 
 ### Chain Building (ChainWalker)
 
-For each certificate, looks up the issuer in the keystore by matching the AKI (Authority Key Identifier) against SKIs (Subject Key Identifiers) of stored certificates. When multiple candidates share the same SKI, `pickOne` disambiguates by preferring self-signed certificates (shortest chain). A visited-set prevents infinite loops on circular references.
+For each certificate, looks up the issuer in the keystore by matching the AKI (Authority Key Identifier) against SKIs (
+Subject Key Identifiers) of stored certificates. When multiple candidates share the same SKI, `pickOne` disambiguates by
+preferring self-signed certificates (shortest chain). A visited-set prevents infinite loops on circular references.
 
 ### Trust Sources
 
-| Source | Description |
-|--------|-------------|
-| **TSL** | Trusted Service List (downloaded XML → BKS keystore) |
-| **CA_FOLDER** | Local `ca/` directory next to the BKS file |
+| Source        | Description                                          |
+|---------------|------------------------------------------------------|
+| **TSL**       | Trusted Service List (downloaded XML → BKS keystore) |
+| **CA_FOLDER** | Local `ca/` directory next to the BKS file           |
 
 ## Test Resources
 
-| File | Description |
-|------|-------------|
-| `2F0CB09B...cer` | Минцифры self-signed root |
-| `12BC4208...cer` | ФК issued by Минцифры |
-| `1D131217...cer` | Минцифры cross-cert from Минкомсвязь |
-| `untrusted/ROOT.cer` | Test root CA (GOST, not trusted) |
-| `untrusted/CA.cer` | Test intermediate CA |
-| `untrusted/USER.cer` | Test end-entity cert |
+| File                 | Description                          |
+|----------------------|--------------------------------------|
+| `2F0CB09B...cer`     | Минцифры self-signed root            |
+| `12BC4208...cer`     | ФК issued by Минцифры                |
+| `1D131217...cer`     | Минцифры cross-cert from Минкомсвязь |
+| `untrusted/ROOT.cer` | Test root CA (GOST, not trusted)     |
+| `untrusted/CA.cer`   | Test intermediate CA                 |
+| `untrusted/USER.cer` | Test end-entity cert                 |
 
 ## Creating a Release
 

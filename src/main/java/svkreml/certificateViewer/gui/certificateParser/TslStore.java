@@ -14,6 +14,8 @@ import java.io.*;
 import java.net.URI;
 import java.net.URL;
 import java.nio.file.Files;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.security.*;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
@@ -38,6 +40,8 @@ import java.util.stream.Collectors;
  */
 @Slf4j
 public class TslStore {
+
+    private static final int STALE_DAYS_THRESHOLD = 30;
 
     private static final char[] BKS_PASSWORD = "cgvybtunm,ovgcfre".toCharArray();
     private final Set<X509Certificate> caFolderCerts = ConcurrentHashMap.newKeySet();
@@ -74,26 +78,27 @@ public class TslStore {
         log.debug("BKS path: {}", tsl_location_bks);
         if (file.exists()) {
             log.debug("BKS exists, loading...");
-            trusted.load(new FileInputStream(tsl_location_bks), BKS_PASSWORD);
+            try (var fis = new FileInputStream(tsl_location_bks)) {
+                trusted.load(fis, BKS_PASSWORD);
+            }
             addRootCertsFromCaFolder(trusted, tsl_location_bks);
 
-            Date createDate = new Date(Long.parseLong(
+            var createDate = Instant.ofEpochMilli(Long.parseLong(
                     new String(((KeyStore.SecretKeyEntry) trusted.getEntry("info",
                             new KeyStore.PasswordProtection("creation date".toCharArray()))).getSecretKey()
                             .getEncoded()))
             );
-            Calendar cal = Calendar.getInstance();
-            cal.add(Calendar.DATE, -30);
-            log.debug("BKS creation date: {}, threshold: {}", createDate, cal.getTime());
-            if (createDate.before(cal.getTime())) {
-                log.info("Tsl уже старый ({}), обновим", createDate);
+            var threshold = Instant.now().minus(STALE_DAYS_THRESHOLD, ChronoUnit.DAYS);
+            log.debug("BKS creation date: {}, threshold: {}", createDate, threshold);
+            if (createDate.isBefore(threshold)) {
+                log.info("TSL is stale ({}), refreshing", createDate);
                 return convertXmlToBks(localization);
             }
-            log.info("Tsl ещё не старый ({}), используем существующий", createDate);
+            log.info("TSL is up-to-date ({}), using existing", createDate);
             return trusted;
         }
-        log.info("Tsl ещё не создан, создаём");
-        log.debug("Создаём папки {}", file.getAbsoluteFile().getParentFile().mkdirs());
+        log.info("TSL not found, creating");
+        log.debug("Creating directories {}", file.getAbsoluteFile().getParentFile().mkdirs());
         return convertXmlToBks(localization);
     }
 
@@ -134,11 +139,11 @@ public class TslStore {
             NoSuchProviderException,
             NoSuchAlgorithmException,
             CertificateException {
-        log.info("Качаем TSL {}", localization.TSL_LOCATION);
+        log.info("Downloading TSL from {}", localization.TSL_LOCATION);
         Set<X509Certificate> list = downloadTsl(localization);
         log.info("TSL downloaded, certs count: {}", list.size());
 
-        list = list.stream().filter(c -> c.getNotAfter().after(new Date())).collect(Collectors.toSet());
+        list = list.stream().filter(c -> c.getNotAfter().toInstant().isAfter(Instant.now())).collect(Collectors.toSet());
 
         return initTLSStore(localization, list);
     }
@@ -166,14 +171,16 @@ public class TslStore {
                     x509Certificate.getSubjectX500Principal());
         }
         addRootCertsFromCaFolder(trusted1, localization.TSL_LOCATION_BKS);
-        byte[] keyBytes = ("" + new Date().getTime()).getBytes();
-        SecretKey a = new SecretKeySpec(keyBytes, "AES");
-        Set<KeyStore.Entry.Attribute> b = new HashSet<>();
-        KeyStore.SecretKeyEntry entry = new KeyStore.SecretKeyEntry(a, b);
+        byte[] keyBytes = ("" + Instant.now().toEpochMilli()).getBytes();
+        SecretKey creationTimestamp = new SecretKeySpec(keyBytes, "AES");
+        Set<KeyStore.Entry.Attribute> attributes = new HashSet<>();
+        KeyStore.SecretKeyEntry entry = new KeyStore.SecretKeyEntry(creationTimestamp, attributes);
 
         KeyStore.ProtectionParameter params = new KeyStore.PasswordProtection("creation date".toCharArray());
         trusted1.setEntry("info", entry, params);
-        trusted1.store(new FileOutputStream(localization.TSL_LOCATION_BKS), BKS_PASSWORD);
+        try (var fos = new FileOutputStream(localization.TSL_LOCATION_BKS)) {
+            trusted1.store(fos, BKS_PASSWORD);
+        }
         log.info("BKS saved to {}, total certs: {}", localization.TSL_LOCATION_BKS, count);
         return trusted1;
     }

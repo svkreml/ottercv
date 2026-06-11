@@ -31,7 +31,6 @@ public class Alerts {
         alert.setHeaderText(headerText);
 
         alert.getDialogPane().setContent(textArea);
-        alert.setResizable(true);
         alert.show();
     }
 

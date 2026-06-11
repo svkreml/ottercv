@@ -21,18 +21,24 @@ public class TabGeneral {
     private static final String LABEL_FONT = "-fx-font-size: 12px;";
     private static final String VALUE_FONT = "-fx-font-size: 12px; -fx-font-weight: bold;";
     private static final String DETAILS_FONT = "-fx-font-family: 'monospaced'; -fx-font-size: 11px;";
+    private static final String TITLE_FONT = "-fx-font-size: 14px; -fx-font-weight: bold;";
+    private static final String BG_COLOR = "#f8f9fa";
+    private static final String BORDER_COLOR = "#ced4da";
+    private static final String TRUSTED_COLOR = "#1a7f37";
+    private static final String BROKEN_COLOR = "#c92a2a";
+    private static final String UNKNOWN_COLOR = "#e67700";
 
     public static Tab create(Localization localization, CertificateModel certificateModel) {
         CertificateModel.CertificateGeneralInfo certificateGeneralInfo = certificateModel.certificateGeneralInfo;
         VBox root = new VBox(10);
         root.setPadding(new Insets(12));
-        root.setBackground(new Background(new BackgroundFill(Color.web("#f8f9fa"), CornerRadii.EMPTY, Insets.EMPTY)));
+        root.setBackground(new Background(new BackgroundFill(Color.web(BG_COLOR), CornerRadii.EMPTY, Insets.EMPTY)));
 
         Tab tabGeneral = new Tab(localization.TAB_GENERAL_TITLE, root);
         tabGeneral.setClosable(false);
 
         Label titleLabel = new Label(localization.TAB_GENERAL_LABEL_CERTIFICATE_INFORMATION);
-        titleLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: bold;");
+        titleLabel.setStyle(TITLE_FONT);
         root.getChildren().add(titleLabel);
 
         Separator sep1 = new Separator();
@@ -53,7 +59,7 @@ public class TabGeneral {
                 case TRUSTED:
                     circle.setFill(Color.GREEN);
                     statusLabel.setText(localization.nameCertificateStatus(CertificateStatus.TRUSTED));
-                    statusLabel.setTextFill(Color.web("#1a7f37"));
+                    statusLabel.setTextFill(Color.web(TRUSTED_COLOR));
                     break;
                 case UNTRUSTED_ROOT:
                 case UNTRUSTED_CHAIN:
@@ -61,12 +67,12 @@ public class TabGeneral {
                 case OVERDUE:
                     circle.setFill(Color.RED);
                     statusLabel.setText(localization.nameCertificateStatus(certificateGeneralInfo.certificateStatus.getValue()));
-                    statusLabel.setTextFill(Color.web("#c92a2a"));
+                    statusLabel.setTextFill(Color.web(BROKEN_COLOR));
                     break;
                 case UNKNOWN:
                     circle.setFill(Color.GOLD);
                     statusLabel.setText(localization.nameCertificateStatus(CertificateStatus.UNKNOWN));
-                    statusLabel.setTextFill(Color.web("#e67700"));
+                    statusLabel.setTextFill(Color.web(UNKNOWN_COLOR));
                     break;
             }
         });
@@ -79,7 +85,7 @@ public class TabGeneral {
         detailsArea.setWrapText(true);
         detailsArea.setStyle(DETAILS_FONT);
         detailsArea.setBackground(new Background(new BackgroundFill(Color.WHITE, CornerRadii.EMPTY, Insets.EMPTY)));
-        detailsArea.setBorder(new Border(new BorderStroke(Color.web("#ced4da"),
+        detailsArea.setBorder(new Border(new BorderStroke(Color.web(BORDER_COLOR),
                 BorderStrokeStyle.SOLID,
                 new CornerRadii(4),
                 new BorderWidths(1))));

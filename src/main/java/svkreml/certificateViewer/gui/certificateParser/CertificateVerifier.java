@@ -21,12 +21,10 @@ import java.util.*;
  */
 @Slf4j
 public class CertificateVerifier {
-    Set<X509Certificate> trustedRootCerts = new HashSet<>();
-    Set<X509Certificate> intermediateCerts = new HashSet<>();
-    Set<TrustAnchor> trustAnchors = new HashSet<>();
-    CertPathBuilder certPathBuilder;
-    CertStore certStore;
-    X509CertSelector selector = new X509CertSelector();
+    private final Set<TrustAnchor> trustAnchors = new HashSet<>();
+    private final CertPathBuilder certPathBuilder;
+    private final CertStore certStore;
+    private final X509CertSelector selector = new X509CertSelector();
 
     /**
      * Initializes the verifier by partitioning the given certificates into
@@ -43,6 +41,8 @@ public class CertificateVerifier {
             InvalidAlgorithmParameterException {
         long start = System.currentTimeMillis();
         log.debug("Initializing CertificateVerifier with {} certs", additionalCerts.size());
+        Set<X509Certificate> trustedRootCerts = new HashSet<>();
+        Set<X509Certificate> intermediateCerts = new HashSet<>();
         for (X509Certificate additionalCert : additionalCerts) {
             boolean selfSigned = isSelfSigned(additionalCert);
             log.debug("Cert subject={}, selfSigned={}", additionalCert.getSubjectX500Principal(), selfSigned);

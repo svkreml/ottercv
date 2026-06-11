@@ -18,6 +18,12 @@ import java.util.*;
 
 @Slf4j
 public class CertificateParser {
+
+    private static final String SHA1 = "SHA-1";
+    private static final String SHA256 = "SHA-256";
+    private static final int HEX_RADIX = 16;
+    private static final String VERSION_PREFIX = "V";
+
     static {
         if (!(X500Name.getDefaultStyle() instanceof CustomBCStyle)) {
             X500Name.setDefaultStyle(new CustomBCStyle());
@@ -30,7 +36,6 @@ public class CertificateParser {
         Map<ASN1ObjectIdentifier, String> issuer = x500NameToMap(x509CertificateHolder.getIssuer());
         Map<ASN1ObjectIdentifier, String> subject = x500NameToMap(x509CertificateHolder.getSubject());
 
-
         CertificateModel.CertificateGeneralInfo certificateGeneralInfo = new CertificateModel.CertificateGeneralInfo(
                 issuer.get(X500Name.getDefaultStyle().attrNameToOID("CN")),
                 subject.get(X500Name.getDefaultStyle().attrNameToOID("CN")),
@@ -39,141 +44,120 @@ public class CertificateParser {
         );
 
         List<CertificateModel.CertificateDetail> certificateDetails = new ArrayList<>();
-        certificateDetails.add(new CertificateModel.CertificateDetail(localization.TAB_DETAIL_TABLE_KEY_VERSION,
-                "V" + (x509CertificateHolder.getVersionNumber()),
-                null,
-                DetailType.PROP));
-        certificateDetails.add(new CertificateModel.CertificateDetail(localization.TAB_DETAIL_TABLE_KEY_SERIAL_NUMBER,
-                x509CertificateHolder.getSerialNumber().toString(16),
-                null,
-                DetailType.PROP));
-        certificateDetails.add(new CertificateModel.CertificateDetail(localization.TAB_DETAIL_TABLE_KEY_ALG,
-                localization.convertOidToString(x509CertificateHolder.getSignatureAlgorithm().getAlgorithm()),
-                null,
-                DetailType.PROP));
-        certificateDetails.add(new CertificateModel.CertificateDetail(localization.TAB_DETAIL_TABLE_KEY_ISSUER,
-                parseX500ToTextArea(issuer),
-                null,
-                DetailType.PROP));
-        certificateDetails.add(new CertificateModel.CertificateDetail(localization.TAB_DETAIL_TABLE_KEY_VALID_FROM,
-                localization.formatDate(certificateGeneralInfo.getValidFrom()),
-                null,
-                DetailType.PROP));
-        certificateDetails.add(new CertificateModel.CertificateDetail(localization.TAB_DETAIL_TABLE_KEY_VALID_UNTIL,
-                localization.formatDate(certificateGeneralInfo.getValidTo()),
-                null,
-                DetailType.PROP));
-        certificateDetails.add(new CertificateModel.CertificateDetail(localization.TAB_DETAIL_TABLE_KEY_SUBJECT,
-                parseX500ToTextArea(subject),
-                null,
+        addBasicDetails(localization, x509CertificateHolder, issuer, subject, certificateGeneralInfo, certificateDetails);
+        addPublicKeyDetails(localization, x509CertificateHolder, certificateDetails);
+        addExtensionDetails(localization, x509CertificateHolder, certificateDetails);
+        addThumbprints(localization, x509CertificateHolder, certificateDetails);
+
+        return new CertificateModel(certificateGeneralInfo, certificateDetails);
+    }
+
+    private static void addBasicDetails(Localization localization,
+                                        X509CertificateHolder holder,
+                                        Map<ASN1ObjectIdentifier, String> issuer,
+                                        Map<ASN1ObjectIdentifier, String> subject,
+                                        CertificateModel.CertificateGeneralInfo info,
+                                        List<CertificateModel.CertificateDetail> details) {
+        details.add(new CertificateModel.CertificateDetail(localization.TAB_DETAIL_TABLE_KEY_VERSION,
+                VERSION_PREFIX + (holder.getVersionNumber()), null, DetailType.PROP));
+        details.add(new CertificateModel.CertificateDetail(localization.TAB_DETAIL_TABLE_KEY_SERIAL_NUMBER,
+                holder.getSerialNumber().toString(HEX_RADIX), null, DetailType.PROP));
+        details.add(new CertificateModel.CertificateDetail(localization.TAB_DETAIL_TABLE_KEY_ALG,
+                localization.convertOidToString(holder.getSignatureAlgorithm().getAlgorithm()),
+                null, DetailType.PROP));
+        details.add(new CertificateModel.CertificateDetail(localization.TAB_DETAIL_TABLE_KEY_ISSUER,
+                parseX500ToTextArea(issuer), null, DetailType.PROP));
+        details.add(new CertificateModel.CertificateDetail(localization.TAB_DETAIL_TABLE_KEY_VALID_FROM,
+                localization.formatDate(info.getValidFrom()), null, DetailType.PROP));
+        details.add(new CertificateModel.CertificateDetail(localization.TAB_DETAIL_TABLE_KEY_VALID_UNTIL,
+                localization.formatDate(info.getValidTo()), null, DetailType.PROP));
+        details.add(new CertificateModel.CertificateDetail(localization.TAB_DETAIL_TABLE_KEY_SUBJECT,
+                parseX500ToTextArea(subject), null, DetailType.PROP));
+    }
+
+    private static void addPublicKeyDetails(Localization localization,
+                                            X509CertificateHolder holder,
+                                            List<CertificateModel.CertificateDetail> details) throws Exception {
+        details.add(new CertificateModel.CertificateDetail(localization.TAB_DETAIL_TABLE_KEY_PUBLIC_KEY,
+                localization.convertOidToString(holder.getSubjectPublicKeyInfo().getAlgorithm().getAlgorithm()),
+                holder.getSubjectPublicKeyInfo().getPublicKeyData().getString().substring(1),
                 DetailType.PROP));
 
-        certificateDetails.add(new CertificateModel.CertificateDetail(localization.TAB_DETAIL_TABLE_KEY_PUBLIC_KEY,
-                localization.convertOidToString(x509CertificateHolder.getSubjectPublicKeyInfo()
-                        .getAlgorithm()
-                        .getAlgorithm())
-                , x509CertificateHolder.getSubjectPublicKeyInfo().getPublicKeyData().getString().substring(1)
-                , DetailType.PROP));
+        KeyInfo keyInfo = KeyParser.getKeyInfo(
+                KeyParser.loadCertificate(holder.getEncoded()).getPublicKey());
+        String exponentPart = (keyInfo.getExponent() != null)
+                ? ("\n" + localization.TAB_DETAIL_TABLE_KEY_PUBLIC_KEY_RSA_EXP + " " + keyInfo.getExponent())
+                : "";
+        details.add(new CertificateModel.CertificateDetail(localization.TAB_DETAIL_TABLE_KEY_PUBLIC_KEY_DETAILS,
+                localization.TAB_DETAIL_TABLE_KEY_PUBLIC_KEY_LENGTH + " " + keyInfo.getSize() +
+                        "\n" + localization.TAB_DETAIL_TABLE_KEY_PUBLIC_KEY_ALG + " " + keyInfo.getAlgorithm() +
+                        "\n" + localization.TAB_DETAIL_TABLE_KEY_PUBLIC_KEY_PARAMS + " " + keyInfo.getDetailedAlgorithm() +
+                        exponentPart,
+                null, DetailType.PROP));
+    }
 
-        KeyInfo
-                keyInfo =
-                KeyParser.getKeyInfo(KeyParser.loadCertificate(x509CertificateHolder.getEncoded()).getPublicKey());
-        certificateDetails.add(new CertificateModel.CertificateDetail(localization.TAB_DETAIL_TABLE_KEY_PUBLIC_KEY_DETAILS,
-                localization.TAB_DETAIL_TABLE_KEY_PUBLIC_KEY_LENGTH +
-                        " " +
-                        keyInfo.getSize()
-                        +
-                        "\n" +
-                        localization.TAB_DETAIL_TABLE_KEY_PUBLIC_KEY_ALG +
-                        " " +
-                        keyInfo.getAlgorithm() +
-                        "\n" +
-                        localization.TAB_DETAIL_TABLE_KEY_PUBLIC_KEY_PARAMS +
-                        " " +
-                        keyInfo.getDetailedAlgorithm() +
-                        ((keyInfo.getExponent() != null) ?
-                                ("\n" +
-                                        localization.TAB_DETAIL_TABLE_KEY_PUBLIC_KEY_RSA_EXP +
-                                        " " +
-                                        keyInfo.getExponent()) :
-                                "")
-                , null
-                , DetailType.PROP));
-
-        for (Object extensionOID : x509CertificateHolder.getExtensionOIDs()) {
-            Extension extension = x509CertificateHolder.getExtension((ASN1ObjectIdentifier) extensionOID);
+    private static void addExtensionDetails(Localization localization,
+                                            X509CertificateHolder holder,
+                                            List<CertificateModel.CertificateDetail> details) {
+        for (Object extensionOID : holder.getExtensionOIDs()) {
+            Extension extension = holder.getExtension((ASN1ObjectIdentifier) extensionOID);
             try {
-                certificateDetails.add(ExtensionParser.parseExtension(localization, extension));
+                details.add(ExtensionParser.parseExtension(localization, extension));
             } catch (Exception e) {
                 try {
-                    certificateDetails.add(new CertificateModel.CertificateDetail(
-                            localization.convertOidToString(extension.getExtnId()) +
-                                    ", " +
-                                    extension.getExtnId().getId(),
-                            e.getMessage(),
-                            extension.getParsedValue().toString(),
-                            extension.isCritical() ? DetailType.CRIT_EXT : DetailType.NON_CRIT_EXT)
-                    );
+                    details.add(new CertificateModel.CertificateDetail(
+                            localization.convertOidToString(extension.getExtnId()) + ", " + extension.getExtnId().getId(),
+                            e.getMessage(), extension.getParsedValue().toString(),
+                            extension.isCritical() ? DetailType.CRIT_EXT : DetailType.NON_CRIT_EXT));
                     log.debug("Failed to parse extension", e);
                 } catch (Exception ex) {
-                    certificateDetails.add(new CertificateModel.CertificateDetail(
-                            localization.convertOidToString(extension.getExtnId()) +
-                                    ", " +
-                                    extension.getExtnId().getId(),
-                            e.getMessage(),
-                            null,
-                            extension.isCritical() ? DetailType.CRIT_EXT : DetailType.NON_CRIT_EXT)
-                    );
+                    details.add(new CertificateModel.CertificateDetail(
+                            localization.convertOidToString(extension.getExtnId()) + ", " + extension.getExtnId().getId(),
+                            e.getMessage(), null,
+                            extension.isCritical() ? DetailType.CRIT_EXT : DetailType.NON_CRIT_EXT));
                     log.debug("Failed to parse extension fallback", ex);
                 }
             }
         }
+    }
 
-        certificateDetails.add(new CertificateModel.CertificateDetail(localization.TAB_DETAIL_TABLE_KEY_THUMBPRINT_ALG,
-                "SHA1",
-                null,
-                DetailType.THUMBPRINT));
-        certificateDetails.add(new CertificateModel.CertificateDetail(localization.TAB_DETAIL_TABLE_KEY_THUMBPRINT_VALUE,
-                getThumbprintSha1(x509CertificateHolder.getEncoded()),
-                null,
-                DetailType.THUMBPRINT));
+    private static void addThumbprints(Localization localization,
+                                       X509CertificateHolder holder,
+                                       List<CertificateModel.CertificateDetail> details)
+            throws NoSuchAlgorithmException, java.io.IOException {
+        details.add(new CertificateModel.CertificateDetail(localization.TAB_DETAIL_TABLE_KEY_THUMBPRINT_ALG,
+                "SHA1", null, DetailType.THUMBPRINT));
+        details.add(new CertificateModel.CertificateDetail(localization.TAB_DETAIL_TABLE_KEY_THUMBPRINT_VALUE,
+                getThumbprint(holder.getEncoded(), SHA1), null, DetailType.THUMBPRINT));
 
-        certificateDetails.add(new CertificateModel.CertificateDetail(localization.TAB_DETAIL_TABLE_KEY_THUMBPRINT_ALG,
-                "SHA256",
-                null,
-                DetailType.THUMBPRINT));
-        certificateDetails.add(new CertificateModel.CertificateDetail(localization.TAB_DETAIL_TABLE_KEY_THUMBPRINT_VALUE,
-                getThumbprintSha256(x509CertificateHolder.getEncoded()),
-                null,
-                DetailType.THUMBPRINT));
-
-        return new CertificateModel(certificateGeneralInfo, certificateDetails);
+        details.add(new CertificateModel.CertificateDetail(localization.TAB_DETAIL_TABLE_KEY_THUMBPRINT_ALG,
+                "SHA256", null, DetailType.THUMBPRINT));
+        details.add(new CertificateModel.CertificateDetail(localization.TAB_DETAIL_TABLE_KEY_THUMBPRINT_VALUE,
+                getThumbprint(holder.getEncoded(), SHA256), null, DetailType.THUMBPRINT));
     }
 
     public static Map<ASN1ObjectIdentifier, String> x500NameToMap(X500Name x500Name) {
         Map<ASN1ObjectIdentifier, String> map = new LinkedHashMap<>();
         RDN[] rdNs = x500Name.getRDNs();
-        for (int i = rdNs.length - 1; i >= 0; i--) {
-            RDN rdn = rdNs[i];
+        for (int index = rdNs.length - 1; index >= 0; index--) {
+            RDN rdn = rdNs[index];
             map.put(rdn.getFirst().getType(), rdn.getFirst().getValue().toString());
         }
         return map;
     }
 
     public static String getThumbprintSha1(byte[] cert) throws NoSuchAlgorithmException {
-        MessageDigest md = MessageDigest.getInstance("SHA-1");
-        md.update(cert);
-        byte[] digest = md.digest();
-        String digestHex = Hex.toHexString(digest);
-        return digestHex.toLowerCase();
+        return getThumbprint(cert, SHA1);
     }
 
     public static String getThumbprintSha256(byte[] cert) throws NoSuchAlgorithmException {
-        MessageDigest md = MessageDigest.getInstance("SHA-256");
+        return getThumbprint(cert, SHA256);
+    }
+
+    private static String getThumbprint(byte[] cert, String algorithm) throws NoSuchAlgorithmException {
+        MessageDigest md = MessageDigest.getInstance(algorithm);
         md.update(cert);
-        byte[] digest = md.digest();
-        String digestHex = Hex.toHexString(digest);
-        return digestHex.toLowerCase();
+        return Hex.toHexString(md.digest()).toLowerCase();
     }
 
     public static String parseX500ToTextArea(Map<ASN1ObjectIdentifier, String> x500) {

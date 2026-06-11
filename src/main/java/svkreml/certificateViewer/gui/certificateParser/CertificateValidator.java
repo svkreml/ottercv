@@ -1,7 +1,11 @@
 package svkreml.certificateViewer.gui.certificateParser;
 
+import lombok.AccessLevel;
 import lombok.Getter;
+import lombok.RequiredArgsConstructor;
 import lombok.Setter;
+import lombok.experimental.Accessors;
+import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 import org.bouncycastle.asn1.x500.X500Name;
@@ -46,30 +50,36 @@ import java.util.*;
 @Slf4j
 @Getter
 @Setter
+@Accessors(chain = true)
+@FieldDefaults(level = AccessLevel.PRIVATE)
+@RequiredArgsConstructor
 public class CertificateValidator {
 
-    private Localization localization;
-    private X509CertificateHolder x509CertificateHolder;
-    private List<String> verificationDetails;
-    private CertificateStatus certificateStatus;
-    private ArrayList<CertificateModel.CertificateChain> certificateChains;
-
+    private static final String CA_ISSUERS_OID = "1.3.6.1.5.5.7.48.2";
+    private static final int MAX_CERT_BYTES = 20000;
     private static final CertificateChainValidator chainValidator = new CertificateChainValidator();
 
-    public CertificateValidator(Localization localization, X509CertificateHolder x509CertificateHolder) {
-        this.localization = localization;
-        this.x509CertificateHolder = x509CertificateHolder;
+    final Localization localization;
+    final X509CertificateHolder x509CertificateHolder;
+    List<String> verificationDetails;
+    CertificateStatus certificateStatus;
+    ArrayList<CertificateModel.CertificateChain> certificateChains;
+
+    private static void addDetail(List<String> details, String message) {
+        if (details != null) {
+            details.add(message);
+        }
     }
 
     private static CertificateStatus getCertificateStatus(X509CertificateHolder x509CertificateHolder,
-                                                          List<String> verificationDetails,
-                                                          CertificateVerifier certificateVerifier) {
+                                                           List<String> verificationDetails,
+                                                           CertificateVerifier certificateVerifier) {
         X509Certificate cert;
         try {
             cert = KeyParser.loadCertificate(x509CertificateHolder.getEncoded());
         } catch (Exception e) {
             log.error("Failed to parse certificate for status check", e);
-            if (verificationDetails != null) verificationDetails.add("Failed to parse certificate: " + e.getMessage());
+            addDetail(verificationDetails, "Failed to parse certificate: " + e.getMessage());
             return CertificateStatus.BROKEN;
         }
         CertificateStatus certificateStatus;
@@ -101,17 +111,15 @@ public class CertificateValidator {
 
             String statusMsg = trustedViaCaFolder ? Messages.CERTIFICATE_TRUSTED_VIA_CA_FOLDER : Messages.CERTIFICATE_IN_TSL;
             log.info("Trust source: {}", trustedViaCaFolder ? "CA_FOLDER" : "TSL");
-            if (verificationDetails != null) {
-                verificationDetails.add(statusMsg);
-            }
+            addDetail(verificationDetails, statusMsg);
             certificateStatus = CertificateStatus.TRUSTED;
         } catch (Exception e) {
             log.error("Certificate verification failed for subject={}: {}",
                     cert.getSubjectX500Principal(), e.getMessage(), e);
-            if (verificationDetails != null) verificationDetails.add(e.getMessage());
+            addDetail(verificationDetails, e.getMessage());
             Throwable cause = e.getCause();
             while (cause != null) {
-                if (verificationDetails != null) verificationDetails.add(cause.getMessage());
+                addDetail(verificationDetails, cause.getMessage());
                 log.debug("Cause: {}", cause.getMessage());
                 cause = cause.getCause();
             }
@@ -138,23 +146,23 @@ public class CertificateValidator {
             InvalidAlgorithmParameterException,
             IOException {
         verificationDetails = new ArrayList<>();
-        Set<X509Certificate> gostTlsStore;
+        Set<X509Certificate> chainCerts;
         try {
             log.debug("Building trust chain for cert subject={}", x509CertificateHolder.getSubject());
-            gostTlsStore = chainValidator.buildChain(localization,
+            chainCerts = chainValidator.buildChain(localization,
                     KeyParser.loadCertificate(x509CertificateHolder.getEncoded()));
-            log.info("Trust chain built, size={}", gostTlsStore.size());
+            log.info("Trust chain built, size={}", chainCerts.size());
         } catch (Exception e) {
             log.error("Failed to initialize trust chain builder", e);
             verificationDetails.add(e.getMessage());
-            gostTlsStore = new HashSet<>();
+            chainCerts = new HashSet<>();
         }
         certificateChains = new ArrayList<>();
         Map<ASN1ObjectIdentifier, String> subject = CertificateParser.x500NameToMap(x509CertificateHolder.getSubject());
 
-        if (!gostTlsStore.isEmpty()) {
-            log.info("TSL store has {} certificates, building chain via TSL", gostTlsStore.size());
-            CertificateVerifier certificateVerifier = new CertificateVerifier(gostTlsStore);
+        if (!chainCerts.isEmpty()) {
+            log.info("TSL store has {} certificates, building chain via TSL", chainCerts.size());
+            CertificateVerifier certificateVerifier = new CertificateVerifier(chainCerts);
             certificateStatus =
                     getCertificateStatus(x509CertificateHolder, verificationDetails, certificateVerifier);
             log.debug("Main cert status: {}", certificateStatus);
@@ -162,16 +170,15 @@ public class CertificateValidator {
             certificateChains.add(new CertificateModel.CertificateChain(
                     subject.get(X500Name.getDefaultStyle().attrNameToOID("CN")),
                     certificateStatus, x509CertificateHolder, verificationDetails));
-            for (X509Certificate x509Certificate : gostTlsStore) {
-                X509CertificateHolder
-                        x509CertificateHolder1 =
+            for (X509Certificate x509Certificate : chainCerts) {
+                X509CertificateHolder chainHolder =
                         new X509CertificateHolder(x509Certificate.getEncoded());
-                List<String> verificationDetails1 = new ArrayList<>();
+                List<String> chainDetails = new ArrayList<>();
                 certificateChains.add(new CertificateModel.CertificateChain(
-                        CertificateParser.x500NameToMap(x509CertificateHolder1.getSubject()).get(X500Name.getDefaultStyle()
+                        CertificateParser.x500NameToMap(chainHolder.getSubject()).get(X500Name.getDefaultStyle()
                                 .attrNameToOID("CN")),
-                        getCertificateStatus(x509CertificateHolder1, verificationDetails1, certificateVerifier),
-                        x509CertificateHolder1, verificationDetails1));
+                        getCertificateStatus(chainHolder, chainDetails, certificateVerifier),
+                        chainHolder, chainDetails));
             }
         } else {
             log.warn("TSL store is empty, marking as UNTRUSTED_ROOT");
@@ -180,17 +187,17 @@ public class CertificateValidator {
                     new CertificateModel.CertificateChain(
                             subject.get(X500Name.getDefaultStyle().attrNameToOID("CN")),
                             certificateStatus, x509CertificateHolder, verificationDetails));
-            X509CertificateHolder x509CertificateHolder = this.x509CertificateHolder;
+            X509CertificateHolder currentHolder = this.x509CertificateHolder;
             while (true) {
-                X509CertificateHolder x509CertificateHolder1 = getCa(x509CertificateHolder);
-                if (x509CertificateHolder1 == null) break;
-                List<String> verificationDetails1 = new ArrayList<>();
+                X509CertificateHolder caHolder = getCa(currentHolder);
+                if (caHolder == null) break;
+                List<String> caDetails = new ArrayList<>();
                 certificateChains.add(new CertificateModel.CertificateChain(
-                        CertificateParser.x500NameToMap(x509CertificateHolder1.getSubject()).get(X500Name.getDefaultStyle()
+                        CertificateParser.x500NameToMap(caHolder.getSubject()).get(X500Name.getDefaultStyle()
                                 .attrNameToOID("CN")),
                         CertificateStatus.UNTRUSTED_ROOT,
-                        x509CertificateHolder1, verificationDetails1));
-                x509CertificateHolder = x509CertificateHolder1;
+                        caHolder, caDetails));
+                currentHolder = caHolder;
             }
         }
 
@@ -204,13 +211,12 @@ public class CertificateValidator {
                     AuthorityInformationAccess.fromExtensions(x509CertificateHolder.getExtensions());
             if (instance == null) return null;
             for (AccessDescription accessDescription : instance.getAccessDescriptions()) {
-                if (accessDescription.getAccessMethod().getId().equals("1.3.6.1.5.5.7.48.2")) {
-                    byte[]
-                            bytes =
+                if (accessDescription.getAccessMethod().getId().equals(CA_ISSUERS_OID)) {
+                    byte[] bytes =
                             Streams.readAllLimited(WebUtils.download(accessDescription.getAccessLocation()
                                     .toASN1Primitive()
                                     .toString()
-                                    .split("]", 2)[1]), 20000);
+                                    .split("]", 2)[1]), MAX_CERT_BYTES);
                     return new X509CertificateHolder(Utils.clearCertBytes(bytes));
                 }
             }

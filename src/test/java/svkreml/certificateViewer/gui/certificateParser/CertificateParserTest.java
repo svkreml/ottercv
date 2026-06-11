@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 import java.security.KeyPairGenerator;
 import java.security.Security;
 import java.util.Map;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -22,12 +23,33 @@ class CertificateParserTest {
     }
 
     @Test
-    void x500NameToMapExtractsAllRDNs() {
+    void x500NameToMapExtractsCnOrgAndCountry() {
         X500Name name = new X500Name("CN=Test User, O=Test Org, C=RU");
         Map<ASN1ObjectIdentifier, String> map = CertificateParser.x500NameToMap(name);
-
         assertThat(map).isNotEmpty();
         assertThat(map.values()).contains("Test User", "Test Org", "RU");
+    }
+
+    @Test
+    void x500NameToMapExtractsRussianAttributes() {
+        X500Name name = new X500Name("CN=Тест, O=Организация, C=RU");
+        Map<ASN1ObjectIdentifier, String> map = CertificateParser.x500NameToMap(name);
+        assertThat(map.values()).contains("Тест", "Организация", "RU");
+    }
+
+    @Test
+    void x500NameToMapHandlesSingleRdn() {
+        X500Name name = new X500Name("CN=Only CN");
+        Map<ASN1ObjectIdentifier, String> map = CertificateParser.x500NameToMap(name);
+        assertThat(map).hasSize(1);
+        assertThat(map.values()).contains("Only CN");
+    }
+
+    @Test
+    void x500NameToMapHandlesEmptyValueRdn() {
+        X500Name name = new X500Name("O=, CN=EmptyO");
+        Map<ASN1ObjectIdentifier, String> map = CertificateParser.x500NameToMap(name);
+        assertThat(map.values()).contains("EmptyO", "");
     }
 
     @Test

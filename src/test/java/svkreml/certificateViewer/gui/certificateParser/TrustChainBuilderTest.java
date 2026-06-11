@@ -29,7 +29,7 @@ class TrustChainBuilderTest {
     }
 
     @Test
-    void smallInitFindsChainInKeystore() throws Exception {
+    void buildChainFindsChainInKeystore() throws Exception {
         KeyPairGenerator keyGen = KeyPairGenerator.getInstance("RSA", "BC");
         keyGen.initialize(2048);
 
@@ -49,7 +49,7 @@ class TrustChainBuilderTest {
         Localization localization = new Localization();
         localization.TSL_LOCATION_BKS = bksPath;
 
-        Set<X509Certificate> chain = TrustChainBuilder.smallInit(localization, leafCert);
+        Set<X509Certificate> chain = new CertificateChainValidator().buildChain(localization, leafCert);
 
         assertThat(chain).hasSize(2);
         assertThat(chain).extracting(X509Certificate::getSubjectX500Principal)
@@ -57,7 +57,7 @@ class TrustChainBuilderTest {
     }
 
     @Test
-    void smallInitFindsBothCertsWithSameSubjectAndSki() throws Exception {
+    void buildChainFindsBothCertsWithSameSubjectAndSki() throws Exception {
         KeyPairGenerator keyGen = KeyPairGenerator.getInstance("RSA", "BC");
         keyGen.initialize(2048);
 
@@ -98,7 +98,7 @@ class TrustChainBuilderTest {
         Localization localization = new Localization();
         localization.TSL_LOCATION_BKS = tempBks.getAbsolutePath();
 
-        Set<X509Certificate> chain = TrustChainBuilder.smallInit(localization, leafCert);
+        Set<X509Certificate> chain = new CertificateChainValidator().buildChain(localization, leafCert);
 
         assertThat(chain).hasSizeGreaterThanOrEqualTo(2);
         boolean hasInterCert1 = chain.stream()
@@ -112,7 +112,7 @@ class TrustChainBuilderTest {
     }
 
     @Test
-    void smallInitDisambiguatesCrossCertByIssuer() throws Exception {
+    void buildChainDisambiguatesCrossCertByIssuer() throws Exception {
         KeyPairGenerator keyGen = KeyPairGenerator.getInstance("RSA", "BC");
         keyGen.initialize(2048);
 
@@ -138,7 +138,7 @@ class TrustChainBuilderTest {
         Localization localization = new Localization();
         localization.TSL_LOCATION_BKS = bksPath;
 
-        Set<X509Certificate> chain = TrustChainBuilder.smallInit(localization, aSelfSigned);
+        Set<X509Certificate> chain = new CertificateChainValidator().buildChain(localization, aSelfSigned);
 
         assertThat(chain).hasSize(1);
         X509Certificate found = chain.iterator().next();
@@ -150,7 +150,7 @@ class TrustChainBuilderTest {
     }
 
     @Test
-    void smallInitFindsRootInCaFolderWithDifferentAlias() throws Exception {
+    void buildChainFindsRootInCaFolderWithDifferentAlias() throws Exception {
         KeyPairGenerator keyGen = KeyPairGenerator.getInstance("RSA", "BC");
         keyGen.initialize(2048);
 
@@ -190,7 +190,7 @@ class TrustChainBuilderTest {
         Localization localization = new Localization();
         localization.TSL_LOCATION_BKS = tempBks.getAbsolutePath();
 
-        Set<X509Certificate> chain = TrustChainBuilder.smallInit(localization, leafCert);
+        Set<X509Certificate> chain = new CertificateChainValidator().buildChain(localization, leafCert);
 
         assertThat(chain).hasSize(2);
         assertThat(chain).extracting(X509Certificate::getSubjectX500Principal)
@@ -204,7 +204,7 @@ class TrustChainBuilderTest {
                 .generateCertificate(new ByteArrayInputStream(certBytes));
 
         Localization localization = new Localization();
-        Set<X509Certificate> tslCerts = TrustChainBuilder.gostTlsStore(localization);
+        Set<X509Certificate> tslCerts = new CertificateChainValidator().downloadTsl(localization);
 
         boolean found = tslCerts.stream()
                 .anyMatch(c -> Arrays.equals(c.getSubjectX500Principal().getEncoded(),
@@ -216,21 +216,21 @@ class TrustChainBuilderTest {
     }
 
     @Test
-    void smallInitBuildsChainForFedKaznacheistvo() throws Exception {
+    void buildChainBuildsChainForFedKaznacheistvo() throws Exception {
         X509Certificate fkCert = TestCertUtils.loadCertFromResources("12BC42082D3F6027A29B7A87FE09B0329631C076.cer");
         X509Certificate minCifrySelfSigned = TestCertUtils.loadCertFromResources("2F0CB09BE3550EF17EC4F29C90ABD18BFCAAD63A.cer");
 
         assertThat(fkCert.getIssuerX500Principal())
                 .isEqualTo(minCifrySelfSigned.getSubjectX500Principal());
 
-        byte[] fkAki = TrustChainBuilder.getSubjectKeyIdentifier(minCifrySelfSigned);
+        byte[] fkAki = CertUtils.getSubjectKeyIdentifier(minCifrySelfSigned);
         assertThat(fkAki).isNotNull();
 
         String bksPath = TestCertUtils.createTempBks(minCifrySelfSigned);
         Localization localization = new Localization();
         localization.TSL_LOCATION_BKS = bksPath;
 
-        Set<X509Certificate> chain = TrustChainBuilder.smallInit(localization, fkCert);
+        Set<X509Certificate> chain = new CertificateChainValidator().buildChain(localization, fkCert);
 
         assertThat(chain).as("Chain for FK cert should not be empty").isNotEmpty();
         assertThat(chain).extracting(X509Certificate::getSubjectX500Principal)
@@ -238,24 +238,24 @@ class TrustChainBuilderTest {
     }
 
     @Test
-    void smallInitBuildsChainForFedKaznacheistvoWithCrossCert() throws Exception {
+    void buildChainBuildsChainForFedKaznacheistvoWithCrossCert() throws Exception {
         X509Certificate fkCert = TestCertUtils.loadCertFromResources("12BC42082D3F6027A29B7A87FE09B0329631C076.cer");
         X509Certificate minCifrySelfSigned = TestCertUtils.loadCertFromResources("2F0CB09BE3550EF17EC4F29C90ABD18BFCAAD63A.cer");
         X509Certificate minCifryCrossCert = TestCertUtils.loadCertFromResources("1D13121735DD6E1F59EA58C786B8F7E8B7E6E20F.cer");
 
-        assertThat(Hex.toHexString(TrustChainBuilder.getSubjectKeyIdentifier(minCifrySelfSigned)))
+        assertThat(Hex.toHexString(CertUtils.getSubjectKeyIdentifier(minCifrySelfSigned)))
                 .as("Self-signed and cross-cert must have same SKI")
-                .isEqualTo(Hex.toHexString(TrustChainBuilder.getSubjectKeyIdentifier(minCifryCrossCert)));
+                .isEqualTo(Hex.toHexString(CertUtils.getSubjectKeyIdentifier(minCifryCrossCert)));
 
         String bksPath = TestCertUtils.createTempBksWithDuplicateAlias(
                 minCifrySelfSigned,
-                Hex.toHexString(TrustChainBuilder.getSubjectKeyIdentifier(minCifrySelfSigned)),
+                Hex.toHexString(CertUtils.getSubjectKeyIdentifier(minCifrySelfSigned)),
                 minCifryCrossCert,
-                Hex.toHexString(TrustChainBuilder.getSubjectKeyIdentifier(minCifryCrossCert)) + "-cross");
+                Hex.toHexString(CertUtils.getSubjectKeyIdentifier(minCifryCrossCert)) + "-cross");
         Localization localization = new Localization();
         localization.TSL_LOCATION_BKS = bksPath;
 
-        Set<X509Certificate> chain = TrustChainBuilder.smallInit(localization, fkCert);
+        Set<X509Certificate> chain = new CertificateChainValidator().buildChain(localization, fkCert);
 
         assertThat(chain).as("Chain for FK cert should not be empty").isNotEmpty();
         boolean hasSelfSigned = chain.stream()
@@ -265,14 +265,14 @@ class TrustChainBuilderTest {
     }
 
     @Test
-    void smallInitSelfSignedCertReturnsItself() throws Exception {
+    void buildChainSelfSignedCertReturnsItself() throws Exception {
         X509Certificate selfSigned = TestCertUtils.loadCertFromResources("2F0CB09BE3550EF17EC4F29C90ABD18BFCAAD63A.cer");
 
         String bksPath = TestCertUtils.createTempBks(selfSigned);
         Localization localization = new Localization();
         localization.TSL_LOCATION_BKS = bksPath;
 
-        Set<X509Certificate> chain = TrustChainBuilder.smallInit(localization, selfSigned);
+        Set<X509Certificate> chain = new CertificateChainValidator().buildChain(localization, selfSigned);
 
         assertThat(chain).hasSize(1);
         assertThat(chain.iterator().next().getSubjectX500Principal())
@@ -280,7 +280,7 @@ class TrustChainBuilderTest {
     }
 
     @Test
-    void smallInitCrossCertFindsParent() throws Exception {
+    void buildChainCrossCertFindsParent() throws Exception {
         KeyPairGenerator keyGen = KeyPairGenerator.getInstance("RSA", "BC");
         keyGen.initialize(2048);
 
@@ -306,7 +306,7 @@ class TrustChainBuilderTest {
         Localization localization = new Localization();
         localization.TSL_LOCATION_BKS = bksPath;
 
-        Set<X509Certificate> chain = TrustChainBuilder.smallInit(localization, crossCert);
+        Set<X509Certificate> chain = new CertificateChainValidator().buildChain(localization, crossCert);
 
         assertThat(chain).as("Chain should contain the self-signed parent").isNotEmpty();
         boolean hasSelfSigned = chain.stream()
@@ -316,7 +316,7 @@ class TrustChainBuilderTest {
     }
 
     @Test
-    void smallInitIssuedCertFindsChain() throws Exception {
+    void buildChainIssuedCertFindsChain() throws Exception {
         X509Certificate fkCert = TestCertUtils.loadCertFromResources("12BC42082D3F6027A29B7A87FE09B0329631C076.cer");
         X509Certificate selfSigned = TestCertUtils.loadCertFromResources("2F0CB09BE3550EF17EC4F29C90ABD18BFCAAD63A.cer");
 
@@ -324,7 +324,7 @@ class TrustChainBuilderTest {
         Localization localization = new Localization();
         localization.TSL_LOCATION_BKS = bksPath;
 
-        Set<X509Certificate> chain = TrustChainBuilder.smallInit(localization, fkCert);
+        Set<X509Certificate> chain = new CertificateChainValidator().buildChain(localization, fkCert);
 
         assertThat(chain).as("Chain for issued cert should not be empty").isNotEmpty();
         assertThat(chain).extracting(X509Certificate::getSubjectX500Principal)
@@ -332,7 +332,7 @@ class TrustChainBuilderTest {
     }
 
     @Test
-    void smallInitEmptyKeystoreReturnsEmpty() throws Exception {
+    void buildChainEmptyKeystoreReturnsEmpty() throws Exception {
         KeyPairGenerator keyGen = KeyPairGenerator.getInstance("RSA", "BC");
         keyGen.initialize(2048);
 
@@ -344,13 +344,13 @@ class TrustChainBuilderTest {
         Localization localization = new Localization();
         localization.TSL_LOCATION_BKS = bksPath;
 
-        Set<X509Certificate> chain = TrustChainBuilder.smallInit(localization, rootCert);
+        Set<X509Certificate> chain = new CertificateChainValidator().buildChain(localization, rootCert);
 
         assertThat(chain).as("Chain from empty keystore should be empty").isEmpty();
     }
 
     @Test
-    void smallInitNoParentFoundReturnsEmpty() throws Exception {
+    void buildChainNoParentFoundReturnsEmpty() throws Exception {
         KeyPairGenerator keyGen = KeyPairGenerator.getInstance("RSA", "BC");
         keyGen.initialize(2048);
 
@@ -366,13 +366,13 @@ class TrustChainBuilderTest {
         Localization localization = new Localization();
         localization.TSL_LOCATION_BKS = bksPath;
 
-        Set<X509Certificate> chain = TrustChainBuilder.smallInit(localization, leafCert);
+        Set<X509Certificate> chain = new CertificateChainValidator().buildChain(localization, leafCert);
 
         assertThat(chain).as("Chain should be empty when no parent found").isEmpty();
     }
 
     @Test
-    void smallInitFourLevelChain() throws Exception {
+    void buildChainFourLevelChain() throws Exception {
         KeyPairGenerator keyGen = KeyPairGenerator.getInstance("RSA", "BC");
         keyGen.initialize(2048);
 
@@ -396,7 +396,7 @@ class TrustChainBuilderTest {
         Localization localization = new Localization();
         localization.TSL_LOCATION_BKS = bksPath;
 
-        Set<X509Certificate> chain = TrustChainBuilder.smallInit(localization, leafCert);
+        Set<X509Certificate> chain = new CertificateChainValidator().buildChain(localization, leafCert);
 
         assertThat(chain).hasSize(3);
         assertThat(chain).extracting(X509Certificate::getSubjectX500Principal)
@@ -407,7 +407,7 @@ class TrustChainBuilderTest {
     }
 
     @Test
-    void smallInitDetectsCycleAndStops() throws Exception {
+    void buildChainDetectsCycleAndStops() throws Exception {
         KeyPairGenerator keyGen = KeyPairGenerator.getInstance("RSA", "BC");
         keyGen.initialize(2048);
 
@@ -429,7 +429,7 @@ class TrustChainBuilderTest {
         Localization localization = new Localization();
         localization.TSL_LOCATION_BKS = bksPath;
 
-        Set<X509Certificate> chain = TrustChainBuilder.smallInit(localization, leafCert);
+        Set<X509Certificate> chain = new CertificateChainValidator().buildChain(localization, leafCert);
 
         assertThat(chain).as("Chain should not be infinite due to cycle").isNotEmpty();
         assertThat(chain.size()).as("Chain should not have more than 10 entries").isLessThanOrEqualTo(10);
