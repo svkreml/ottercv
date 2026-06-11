@@ -5,7 +5,7 @@ module svkreml.certificateViewer {
     requires org.bouncycastle.pkix;
     requires java.naming;
     requires jakarta.xml.bind;
-    requires java.net.http;
+    requires static java.net.http;
     requires org.slf4j;
     requires static lombok;
     opens svkreml.certificateViewer.gui.api.model;

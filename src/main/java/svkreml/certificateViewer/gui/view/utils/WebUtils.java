@@ -14,15 +14,10 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.util.Hashtable;
 
 @UtilityClass
 public class WebUtils {
-
-    private final HttpClient HTTP_CLIENT = HttpClient.newHttpClient();
 
     public static InputStream download(String crlURL) throws IOException,
             CertificateVerificationException, NamingException {
@@ -58,15 +53,30 @@ public class WebUtils {
 
     private static InputStream downloadFromWeb(String crlURL)
             throws IOException {
-        HttpRequest request = HttpRequest.newBuilder()
+        try {
+            return downloadWithHttpClient(crlURL);
+        } catch (NoClassDefFoundError e) {
+            return downloadWithUrlStream(crlURL);
+        }
+    }
+
+    private static InputStream downloadWithHttpClient(String crlURL)
+            throws IOException {
+        var client = java.net.http.HttpClient.newHttpClient();
+        var request = java.net.http.HttpRequest.newBuilder()
                 .uri(URI.create(crlURL))
                 .GET()
                 .build();
         try {
-            return HTTP_CLIENT.send(request, HttpResponse.BodyHandlers.ofInputStream()).body();
+            return client.send(request, java.net.http.HttpResponse.BodyHandlers.ofInputStream()).body();
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new IOException("Request interrupted for " + crlURL, e);
         }
+    }
+
+    private static InputStream downloadWithUrlStream(String crlURL)
+            throws IOException {
+        return URI.create(crlURL).toURL().openStream();
     }
 }
