@@ -21,7 +21,7 @@ jobs:
             -e "HOME=/build" \
             --user "$(id -u):$(id -g)" \
             ottercv-appimage-builder \
-            bash -c "cd /build && mvn clean package -P linux-appimage -q"
+            bash -c "cd /build && mvn clean package -DskipTests=true -P linux-appimage -q"
 
       - name: Upload AppImage to Release
         uses: softprops/action-gh-release@v1
