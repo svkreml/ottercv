@@ -1,6 +1,5 @@
 package svkreml.certificateViewer.gui.certificateParser;
 
-import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import svkreml.certificateViewer.gui.localization.ru.Localization;
 
@@ -76,7 +75,7 @@ public class CertificateChainValidator {
             }
         }
         for (java.security.cert.Certificate c : pkixResult.getCertPath().getCertificates()) {
-            if (tslStore.isFromCaFolder((X509Certificate) c)) {
+            if (c instanceof X509Certificate xc && tslStore.isFromCaFolder(xc)) {
                 return TrustSource.CA_FOLDER;
             }
         }

@@ -83,12 +83,13 @@ public class CertificateValidator {
 
             boolean trustedViaCaFolder = false;
             for (java.security.cert.Certificate c : verifiedCertChain.getCertPath().getCertificates()) {
-                X509Certificate xc = (X509Certificate) c;
-                log.debug("Checking chain cert subject={}, isFromCaFolder={}",
-                        xc.getSubjectX500Principal(), chainValidator.isFromCaFolder(xc));
-                if (chainValidator.isFromCaFolder(xc)) {
-                    trustedViaCaFolder = true;
-                    break;
+                if (c instanceof X509Certificate xc) {
+                    log.debug("Checking chain cert subject={}, isFromCaFolder={}",
+                            xc.getSubjectX500Principal(), chainValidator.isFromCaFolder(xc));
+                    if (chainValidator.isFromCaFolder(xc)) {
+                        trustedViaCaFolder = true;
+                        break;
+                    }
                 }
             }
             if (!trustedViaCaFolder && verifiedCertChain.getTrustAnchor() != null) {

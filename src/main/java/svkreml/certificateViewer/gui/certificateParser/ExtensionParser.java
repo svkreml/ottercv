@@ -20,53 +20,20 @@ public class ExtensionParser {
         StringBuilder parsedAsn1Ext = new StringBuilder();
 
         switch (extension.getExtnId().getId()) {
-            case "1.2.643.100.111":
-                parseSubjectSignatureTool(extension, parsedAsn1Ext);
-                break;
-            case "1.2.643.100.112":
-                parseIssuerSignatureTool(localization, extension, parsedAsn1Ext);
-                break;
-            case "2.5.29.14":
-                parseSubjectKeyIdentifier(localization, extension, parsedAsn1Ext);
-                break;
-            case "2.5.29.15":
-                parseKeyUsage(localization, extension, parsedAsn1Ext);
-                break;
-            case "2.5.29.16":
-                parsePrivateKeyUsagePeriod(localization, extension, parsedAsn1Ext);
-                break;
-            case "2.5.29.17":
-                parseSubjectAlternativeName(localization, extension, parsedAsn1Ext);
-                break;
-            case "2.5.29.19":
-                parseBasicConstraints(localization, extension, parsedAsn1Ext);
-                break;
-            case "2.5.29.31":
-                parseCertificateRevocationList(localization, extension, parsedAsn1Ext);
-                break;
-            case "2.5.29.32":
-                parseCertificatePolices(localization, extension, parsedAsn1Ext);
-                break;
-            case "2.5.29.35":
-                parseAuthorityKeyIdentifier(localization, extension, parsedAsn1Ext);
-                break;
-            case "2.5.29.37":
-                parseExtendedKeyUsage(localization, extension, parsedAsn1Ext);
-                break;
-/*            case "1.3.6.1.4.1.11129.2.4.2":
-                parseExtendedValidationCertificate(localization, extension, parsedAsn1Ext);
-                break;*/
-            //  case "1.3.6.1.4.1.311.21.10":
-            //  parseAuthorityKeyIdentifier(extension, parsedAsn1Ext);
-            //     break;
-            case "1.3.6.1.4.1.311.21.10":
-                parseEnhancedKeyUsage(localization, extension, parsedAsn1Ext);
-                break;
-            case "1.3.6.1.5.5.7.1.1":
-                parseAuthorityInformationAccess(localization, extension, parsedAsn1Ext);
-                break;
-            default:
-                parsedAsn1Ext = new StringBuilder(extension.getParsedValue().toString());
+            case "1.2.643.100.111" -> parseSubjectSignatureTool(extension, parsedAsn1Ext);
+            case "1.2.643.100.112" -> parseIssuerSignatureTool(localization, extension, parsedAsn1Ext);
+            case "2.5.29.14" -> parseSubjectKeyIdentifier(localization, extension, parsedAsn1Ext);
+            case "2.5.29.15" -> parseKeyUsage(localization, extension, parsedAsn1Ext);
+            case "2.5.29.16" -> parsePrivateKeyUsagePeriod(localization, extension, parsedAsn1Ext);
+            case "2.5.29.17" -> parseSubjectAlternativeName(localization, extension, parsedAsn1Ext);
+            case "2.5.29.19" -> parseBasicConstraints(localization, extension, parsedAsn1Ext);
+            case "2.5.29.31" -> parseCertificateRevocationList(localization, extension, parsedAsn1Ext);
+            case "2.5.29.32" -> parseCertificatePolices(localization, extension, parsedAsn1Ext);
+            case "2.5.29.35" -> parseAuthorityKeyIdentifier(localization, extension, parsedAsn1Ext);
+            case "2.5.29.37" -> parseExtendedKeyUsage(localization, extension, parsedAsn1Ext);
+            case "1.3.6.1.4.1.311.21.10" -> parseEnhancedKeyUsage(localization, extension, parsedAsn1Ext);
+            case "1.3.6.1.5.5.7.1.1" -> parseAuthorityInformationAccess(localization, extension, parsedAsn1Ext);
+            default -> parsedAsn1Ext = new StringBuilder(extension.getParsedValue().toString());
         }
 
         return new CertificateModel.CertificateDetail(
@@ -281,12 +248,11 @@ public class ExtensionParser {
         if (instance.getAuthorityCertIssuer() != null) {
             parsedAsn1Ext.append("AuthorityCertIssuer: \n");
             for (GeneralName name : instance.getAuthorityCertIssuer().getNames()) {
-                if (name.getName().getClass().getName().equals("org.bouncycastle.asn1.x500.X500Name")) {
-                    Map<String, String> convert = convert((X500Name) name.getName());
+                if (name.getName() instanceof X500Name x500Name) {
+                    Map<String, String> convert = convert(x500Name);
                     for (Map.Entry<String, String> entry : convert.entrySet()) {
-                        String k = entry.getKey();
-                        String v = entry.getValue();
-                        parsedAsn1Ext.append("\t").append(k).append(" = ").append(v).append("\n");
+                        parsedAsn1Ext.append("\t").append(entry.getKey())
+                                .append(" = ").append(entry.getValue()).append("\n");
                     }
                 } else {
                     parsedAsn1Ext.append(name).append("\n");

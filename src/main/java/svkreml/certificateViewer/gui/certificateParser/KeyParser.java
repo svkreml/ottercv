@@ -56,30 +56,29 @@ public class KeyParser {
 
             }
             case "EC" -> {
-                ECPublicKey pubk = (ECPublicKey) publicKey;
-                ECParameterSpec spec = pubk.getParams();
+                var pubk = (ECPublicKey) publicKey;
+                var spec = pubk.getParams();
                 int size = spec.getOrder().bitLength();
-                if (spec instanceof ECNamedCurveSpec) {
-                    return new KeyInfo(algorithm, size, ((ECNamedCurveSpec) spec).getName());
+                if (spec instanceof ECNamedCurveSpec namedSpec) {
+                    return new KeyInfo(algorithm, size, namedSpec.getName());
                 }
-
             }
             case "ECGOST3410-2012" -> {
-                BCECGOST3410_2012PublicKey pubk = (BCECGOST3410_2012PublicKey) publicKey;
-                ECParameterSpec spec = pubk.getParams();
+                var pubk = (BCECGOST3410_2012PublicKey) publicKey;
+                var spec = pubk.getParams();
                 int size = spec.getOrder().bitLength();
-                if (spec instanceof ECNamedCurveSpec) {
-                    return new KeyInfo(algorithm, size, ((ECNamedCurveSpec) spec).getName());
+                if (spec instanceof ECNamedCurveSpec namedSpec) {
+                    return new KeyInfo(algorithm, size, namedSpec.getName());
                 } else {
                     return new KeyInfo(algorithm, size);
                 }
             }
             case "ECGOST3410" -> {
-                BCECGOST3410PublicKey pubk = (BCECGOST3410PublicKey) publicKey;
-                ECParameterSpec spec = pubk.getParams();
+                var pubk = (BCECGOST3410PublicKey) publicKey;
+                var spec = pubk.getParams();
                 int size = spec.getOrder().bitLength();
-                if (spec instanceof ECNamedCurveSpec) {
-                    return new KeyInfo(algorithm, size, ((ECNamedCurveSpec) spec).getName());
+                if (spec instanceof ECNamedCurveSpec namedSpec) {
+                    return new KeyInfo(algorithm, size, namedSpec.getName());
                 } else {
                     return new KeyInfo(algorithm, size);
                 }
