@@ -86,8 +86,8 @@ preferring self-signed certificates (shortest chain). A visited-set prevents inf
 ## Creating a Release
 
 ```bash
-git tag v1.1.1
-git push origin v1.1.1
+git tag v1.1.2
+git push origin v1.1.2
 ```
 
 ## Output

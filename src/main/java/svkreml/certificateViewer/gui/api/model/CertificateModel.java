@@ -74,10 +74,12 @@ public class CertificateModel {
             this.detailType = detailType;
         }
 
+        @SuppressWarnings("unused")
         public Pair<String, DetailType> getFieldWithType() {
             return new Pair<>(field, detailType);
         }
 
+        @SuppressWarnings("unused")
         public String getValueOneLine() {
             return value.replaceAll("([\t ]+)", " ").replaceAll("([\r\n])+", ", ").trim();
         }

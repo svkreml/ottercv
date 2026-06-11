@@ -13,7 +13,7 @@ import java.util.HashMap;
 import java.util.Hashtable;
 import java.util.Map;
 
-@SuppressWarnings({"WeakerAccess", "unchecked"})
+@SuppressWarnings({"WeakerAccess"})
 public class CustomBCStyle
         extends AbstractX500NameStyle {
     //Gost
@@ -300,19 +300,17 @@ public class CustomBCStyle
         DefaultLookUp.put("organizationidentifier", ORGANIZATION_IDENTIFIER);
     }
 
-    @SuppressWarnings("rawtypes")
-    protected final Hashtable defaultLookUp;
-    @SuppressWarnings("rawtypes")
-    protected final Hashtable defaultSymbols;
+    protected final Hashtable<String, ASN1ObjectIdentifier> defaultLookUp;
+    protected final Hashtable<ASN1ObjectIdentifier, String> defaultSymbols;
 
     protected CustomBCStyle() {
         defaultSymbols = copyHashtable(DefaultSymbols);
         defaultLookUp = copyHashtable(DefaultLookUp);
     }
 
-    @SuppressWarnings("unchecked")
-    private static Hashtable copyHashtable(Map source) {
-        return new Hashtable(source);
+
+    private static <A,B> Hashtable<A, B> copyHashtable(Map<A, B> source) {
+        return new Hashtable<>(source);
     }
 
     protected ASN1Encodable encodeStringValue(ASN1ObjectIdentifier oid,
