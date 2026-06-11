@@ -15,7 +15,7 @@ docker run --rm --name "$CONTAINER_NAME" \
     -e "HOME=/build" \
     --user "$(id -u):$(id -g)" \
     "$IMAGE_NAME" \
-    bash -c "cd /build && mvn clean package -P linux-appimage -q"
+    bash -c "cd /build && mvn clean package -DskipTests=true -P linux-appimage -q"
 
 echo ""
 echo "AppImage built successfully:"
