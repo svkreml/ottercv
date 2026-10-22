@@ -4,6 +4,7 @@ import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.util.encoders.Hex;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import svkreml.certificateViewer.gui.localization.ru.Localization;
 
 import java.io.File;
@@ -195,6 +196,7 @@ class TrustChainBuilderTest {
     }
 
     @Test
+    @EnabledIfEnvironmentVariable(named = "RUN_NETWORK_TESTS", matches = "true")
     void downloadTslReturnsCertificates() throws Exception {
         Localization localization = new Localization();
         Set<X509Certificate> tslCerts = new CertificateChainValidator().downloadTsl(localization);
