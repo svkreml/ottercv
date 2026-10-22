@@ -1,18 +1,100 @@
-name: Build AppImage Release
+name: Release
 
 on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
+    inputs:
+      releaseVersion:
+        description: 'Release version, for example 1.1.8 (default: current POM version without -SNAPSHOT)'
+        required: false
+        type: string
+      developmentVersion:
+        description: 'Next development version, for example 1.1.9-SNAPSHOT (default: next patch)'
+        required: false
+        type: string
 
 permissions:
   contents: write
 
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 jobs:
-  build-appimage:
+  release:
     runs-on: ubuntu-22.04
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && github.event.repository.default_branch || github.ref }}
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Determine versions
+        id: versions
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          RELEASE_VERSION_INPUT: ${{ inputs.releaseVersion }}
+          DEVELOPMENT_VERSION_INPUT: ${{ inputs.developmentVersion }}
+        run: |
+          current="$(mvn -B -q help:evaluate -Dexpression=project.version -DforceStdout)"
+          if [[ "$current" != *-SNAPSHOT ]]; then
+            echo "Current POM version must be a SNAPSHOT version, got: $current" >&2
+            exit 1
+          fi
+
+          release="${RELEASE_VERSION_INPUT}"
+          next="${DEVELOPMENT_VERSION_INPUT}"
+          if [[ -z "$release" ]]; then
+            release="${current%-SNAPSHOT}"
+          fi
+          if [[ -z "$next" ]]; then
+            IFS=. read -r major minor patch <<< "$release"
+            next="${major}.${minor}.$((patch + 1))-SNAPSHOT"
+          fi
+
+          if [[ ! "$release" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Invalid release version: $release" >&2
+            exit 1
+          fi
+          if [[ ! "$next" =~ ^[0-9]+\.[0-9]+\.[0-9]+-SNAPSHOT$ ]]; then
+            echo "Invalid development version: $next" >&2
+            exit 1
+          fi
+
+          echo "release=$release" >> "$GITHUB_OUTPUT"
+          echo "next=$next" >> "$GITHUB_OUTPUT"
+          echo "tag=v$release" >> "$GITHUB_OUTPUT"
+          echo "Releasing $release; next version $next"
+
+      - name: Prepare release
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          mvn -B release:prepare \
+            -DreleaseVersion="${{ steps.versions.outputs.release }}" \
+            -DdevelopmentVersion="${{ steps.versions.outputs.next }}" \
+            -Dtag="${{ steps.versions.outputs.tag }}" \
+            -DpushChanges=true
+
+      - name: Set release tag
+        id: release
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "tag=${{ steps.versions.outputs.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout release tag
+        run: git checkout "${{ steps.release.outputs.tag }}"
 
       - name: Build Docker image
         run: docker build -t ottercv-appimage-builder -f Dockerfile.appimage .
@@ -27,8 +109,9 @@ jobs:
             bash -c "cd /build && mvn clean package -DskipTests=true -P linux-appimage -q"
 
       - name: Upload AppImage to Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ steps.release.outputs.tag }}
           files: target/ottercv-*.AppImage
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -159,26 +159,24 @@ preferring self-signed certificates (shortest chain). A visited-set prevents inf
 
 ## Creating a Release
 
-The POM always contains the next development version (`X.Y.Z-SNAPSHOT`). Maven
-Release Plugin performs the release in two steps:
+The POM always contains the next development version (`X.Y.Z-SNAPSHOT`). Releases
+are created by the **Release** GitHub Actions workflow:
 
-```bash
-# Clean working tree and push access to origin are required.
-mvn release:prepare
-mvn release:perform
-```
+1. Open **Actions → Release → Run workflow** on the default branch.
+2. Optionally set `releaseVersion` and `developmentVersion`. By default the
+   workflow releases the POM version without `-SNAPSHOT` and bumps the patch
+   version for the next development iteration.
 
-`release:prepare`:
+The workflow:
 
-- changes `X.Y.Z-SNAPSHOT` to `X.Y.Z`;
-- commits the release version;
-- creates and pushes the tag `vX.Y.Z`;
-- changes the version to `X.Y.(Z+1)-SNAPSHOT`;
-- commits the next development version.
+- validates the requested versions;
+- runs `mvn release:prepare`, which commits the release version, creates and
+  pushes the tag `vX.Y.Z`, then commits the next development version;
+- checks out the release tag;
+- builds the AppImage and publishes it as a GitHub release.
 
-`release:perform` checks out the release tag and runs `clean verify`. Pushing the
-tag triggers `.github/workflows/appimage-release.yml`, which builds the AppImage
-and publishes it as a GitHub release.
+Manually pushing a `v*` tag remains supported: the same workflow builds and
+publishes the AppImage without creating release commits.
 
 ## Output
 
