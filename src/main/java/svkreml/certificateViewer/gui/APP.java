@@ -9,25 +9,34 @@ import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
 import javafx.scene.layout.AnchorPane;
 import javafx.stage.Stage;
+import org.bouncycastle.cert.X509CRLHolder;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import svkreml.certificateViewer.gui.api.model.CertificateModel;
 import svkreml.certificateViewer.gui.api.model.CertificateStatus;
+import svkreml.certificateViewer.gui.api.model.CrlModel;
+import svkreml.certificateViewer.gui.api.model.CrlStatus;
 import svkreml.certificateViewer.gui.certificateParser.CertificateParser;
 import svkreml.certificateViewer.gui.certificateParser.CertificateValidator;
+import svkreml.certificateViewer.gui.certificateParser.CrlParser;
+import svkreml.certificateViewer.gui.certificateParser.CrlSignatureVerifier;
+import svkreml.certificateViewer.gui.certificateParser.InputLoader;
 import svkreml.certificateViewer.gui.localization.ru.Localization;
 import svkreml.certificateViewer.gui.view.tabs.TabChain;
+import svkreml.certificateViewer.gui.view.tabs.TabCrlGeneral;
+import svkreml.certificateViewer.gui.view.tabs.TabCrlRevoked;
 import svkreml.certificateViewer.gui.view.tabs.TabDetails;
 import svkreml.certificateViewer.gui.view.tabs.TabGeneral;
+import svkreml.certificateViewer.gui.view.tabs.TabHelp;
 import svkreml.certificateViewer.gui.view.utils.Alerts;
 import svkreml.certificateViewer.gui.view.utils.FxUtils;
-import svkreml.certificateViewer.gui.view.utils.Utils;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.InvalidAlgorithmParameterException;
 import java.security.NoSuchAlgorithmException;
@@ -37,6 +46,7 @@ import java.security.cert.CertificateException;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
 
 public class APP extends Application {
@@ -71,16 +81,22 @@ public class APP extends Application {
     private void populateStage(AnchorPane rootPane) {
         final List<String> args = this.getParameters().getRaw();
         try {
-            byte[] certificateBytes;
+            byte[] inputBytes;
+            Path sourcePath = null;
             if (args.isEmpty()) {
                 try (InputStream is = getClass().getResourceAsStream("/certs/default.pem")) {
-                    certificateBytes = java.util.Objects.requireNonNull(is, "default.pem not found on classpath").readAllBytes();
+                    inputBytes = java.util.Objects.requireNonNull(is, "default.pem not found on classpath").readAllBytes();
                 }
             } else {
-                certificateBytes = Files.readAllBytes(Paths.get(args.getFirst()));
+                sourcePath = Paths.get(args.getFirst());
+                inputBytes = Files.readAllBytes(sourcePath);
             }
-            certificateBytes = Utils.clearCertBytes(certificateBytes);
-            X509CertificateHolder x509CertificateHolder = new X509CertificateHolder(certificateBytes);
+            InputLoader.LoadedInput loadedInput = InputLoader.load(inputBytes);
+            if (loadedInput.isCrl()) {
+                showCrl(rootPane, loadedInput.crl(), sourcePath);
+                return;
+            }
+            X509CertificateHolder x509CertificateHolder = loadedInput.certificate();
             CertificateModel
                     certificateModel =
                     CertificateParser.getCertificateModel(localization, x509CertificateHolder);
@@ -89,13 +105,51 @@ public class APP extends Application {
                 Tab tabDetails = TabDetails.create(localization, certificateModel);
                 Tab tabCertificationPath = TabChain.create(localization, certificateModel);
                 rootPane.getChildren().clear();
-                addTabs(tabGeneral, tabDetails, tabCertificationPath, rootPane);
+                addTabs(rootPane, tabGeneral, tabDetails, tabCertificationPath, TabHelp.create(localization));
                 buttonOk(rootPane);
                 Platform.runLater(() -> validateCert(x509CertificateHolder, certificateModel));
             });
         } catch (Exception e) {
             Platform.runLater(() -> Alerts.showStackTraceAlert(e));
         }
+    }
+
+    private void showCrl(AnchorPane rootPane, X509CRLHolder crlHolder, Path sourcePath) {
+        try {
+            CrlModel crlModel = CrlParser.getCrlModel(localization, crlHolder);
+            Platform.runLater(() -> {
+                Tab tabGeneral = TabCrlGeneral.create(localization, crlModel);
+                Tab tabDetails = TabDetails.create(localization, crlModel.getDetails());
+                Tab tabRevoked = TabCrlRevoked.create(localization, crlModel);
+                rootPane.getChildren().clear();
+                addTabs(rootPane, tabGeneral, tabDetails, tabRevoked, TabHelp.create(localization));
+                buttonOk(rootPane);
+                verifyCrl(crlHolder, crlModel, sourcePath);
+            });
+        } catch (Exception e) {
+            Platform.runLater(() -> Alerts.showStackTraceAlert(e));
+        }
+    }
+
+    private void verifyCrl(X509CRLHolder crlHolder, CrlModel crlModel, Path sourcePath) {
+        log.info("Verifying CRL issuer={}", crlHolder.getIssuer());
+        CompletableFuture
+                .supplyAsync(() -> CrlSignatureVerifier.verify(crlHolder, sourcePath, localization))
+                .thenAccept(result -> Platform.runLater(() -> {
+                    log.info("CRL verification result: status={}, details={}",
+                            result.status(), result.details());
+                    crlModel.getGeneralInfo().getStatus().setValue(result.status());
+                    crlModel.getGeneralInfo().getStatusDetails().setValue(result.details());
+                }))
+                .exceptionally(e -> {
+                    log.error("Failed to verify CRL signature", e);
+                    Platform.runLater(() -> {
+                        crlModel.getGeneralInfo().getStatus().setValue(CrlStatus.UNKNOWN);
+                        crlModel.getGeneralInfo().getStatusDetails().setValue(
+                                List.of(localization.CRL_ISSUER_NOT_FOUND, String.valueOf(e.getMessage())));
+                    });
+                    return null;
+                });
     }
 
     public void validateCert(X509CertificateHolder x509CertificateHolder, CertificateModel certificateModel) {
@@ -147,14 +201,10 @@ public class APP extends Application {
         return rootPane;
     }
 
-    private void addTabs(Tab tabGeneral, Tab tabDetails, Tab tabCertificationPath, AnchorPane rootPane) {
+    private void addTabs(AnchorPane rootPane, Tab... tabs) {
         TabPane tabPane = new TabPane();
-        tabPane.getTabs().addAll(
-                tabGeneral,
-                tabDetails,
-                tabCertificationPath);
+        tabPane.getTabs().addAll(tabs);
         rootPane.getChildren().add(FxUtils.setAnchorPaneBorders(tabPane, 2.0, 2.0, 2.0, 60.0));
-
     }
 
     private void buttonOk(AnchorPane rootPane) {

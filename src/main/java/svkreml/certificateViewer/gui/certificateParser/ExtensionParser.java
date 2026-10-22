@@ -27,6 +27,11 @@ public class ExtensionParser {
     private static final String OID_SUBJECT_ALTERNATIVE_NAME = "2.5.29.17";
     private static final String OID_BASIC_CONSTRAINTS = "2.5.29.19";
     private static final String OID_CRL_DISTRIBUTION_POINTS = "2.5.29.31";
+    private static final String OID_CRL_NUMBER = "2.5.29.20";
+    private static final String OID_REASON_CODE = "2.5.29.21";
+    private static final String OID_INVALIDITY_DATE = "2.5.29.24";
+    private static final String OID_ISSUING_DISTRIBUTION_POINT = "2.5.29.28";
+    private static final String OID_FRESHEST_CRL = "2.5.29.46";
     private static final String OID_CERTIFICATE_POLICIES = "2.5.29.32";
     private static final String OID_AUTHORITY_KEY_IDENTIFIER = "2.5.29.35";
     private static final String OID_EXTENDED_KEY_USAGE = "2.5.29.37";
@@ -46,6 +51,11 @@ public class ExtensionParser {
             case OID_SUBJECT_ALTERNATIVE_NAME -> parseSubjectAlternativeName(localization, extension, parsedAsn1Ext);
             case OID_BASIC_CONSTRAINTS -> parseBasicConstraints(localization, extension, parsedAsn1Ext);
             case OID_CRL_DISTRIBUTION_POINTS -> parseCertificateRevocationList(localization, extension, parsedAsn1Ext);
+            case OID_CRL_NUMBER -> parseCrlNumber(extension, parsedAsn1Ext);
+            case OID_REASON_CODE -> parseReasonCode(localization, extension, parsedAsn1Ext);
+            case OID_INVALIDITY_DATE -> parseInvalidityDate(localization, extension, parsedAsn1Ext);
+            case OID_ISSUING_DISTRIBUTION_POINT -> parseIssuingDistributionPoint(extension, parsedAsn1Ext);
+            case OID_FRESHEST_CRL -> parseCertificateRevocationList(localization, extension, parsedAsn1Ext);
             case OID_CERTIFICATE_POLICIES -> parseCertificatePolices(localization, extension, parsedAsn1Ext);
             case OID_AUTHORITY_KEY_IDENTIFIER -> parseAuthorityKeyIdentifier(localization, extension, parsedAsn1Ext);
             case OID_EXTENDED_KEY_USAGE -> parseExtendedKeyUsage(localization, extension, parsedAsn1Ext);
@@ -149,6 +159,29 @@ public class ExtensionParser {
         CRLDistPoint crlDistPoint = CRLDistPoint.getInstance(extension.getParsedValue());
         parsedAsn1Ext.append(crlDistPoint.toString()
                 .replaceAll("([\\n\\r\\]]){4,}", "\n]]\n"));
+    }
+
+    private static void parseCrlNumber(Extension extension, StringBuilder parsedAsn1Ext) {
+        parsedAsn1Ext.append(CRLNumber.getInstance(extension.getParsedValue()).getCRLNumber());
+    }
+
+    private static void parseReasonCode(Localization localization,
+                                        Extension extension,
+                                        StringBuilder parsedAsn1Ext) {
+        CRLReason reason = CRLReason.getInstance(extension.getParsedValue());
+        parsedAsn1Ext.append(reason.getValue()).append(": ")
+                .append(localization.nameCrlReason(reason.getValue().intValue()));
+    }
+
+    private static void parseInvalidityDate(Localization localization,
+                                            Extension extension,
+                                            StringBuilder parsedAsn1Ext) throws ParseException {
+        parsedAsn1Ext.append(localization.formatDate(
+                ASN1GeneralizedTime.getInstance(extension.getParsedValue()).getDate()));
+    }
+
+    private static void parseIssuingDistributionPoint(Extension extension, StringBuilder parsedAsn1Ext) {
+        parsedAsn1Ext.append(IssuingDistributionPoint.getInstance(extension.getParsedValue()));
     }
 
     private static void parsePrivateKeyUsagePeriod(Localization localization,

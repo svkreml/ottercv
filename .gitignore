@@ -5,3 +5,5 @@ target/
 .idea/
 .m2/
 .openjfx/
+release.properties
+pom.xml.releaseBackup

@@ -1,6 +1,6 @@
 # OtterCV - Otter Certificate Viewer
 
-JavaFX desktop application for viewing and analyzing X.509 certificates with Russian GOST crypto infrastructure support.
+JavaFX desktop application for viewing and analyzing X.509 certificates and CRLs with Russian GOST crypto infrastructure support.
 
 ## Requirements
 
@@ -21,13 +21,80 @@ mvn clean package -P linux-appimage
 ./build-appimage-docker.sh
 ```
 
+## Help
+
+The application also has an in-app **Справка** tab with usage, network access, and data storage information.
+
+### Launching
+
+#### AppImage
+
+Download `ottercv-<version>-x86_64.AppImage` from the GitHub Releases page, make it executable, and run it:
+
+```bash
+chmod +x ottercv-<version>-x86_64.AppImage
+./ottercv-<version>-x86_64.AppImage [path/to/certificate-or-crl]
+```
+
+The optional argument accepts a certificate or CRL in PEM, DER, or raw Base64 form. Without an argument, the bundled
+`certs/default.pem` is opened.
+
+#### From source
+
+```bash
+mvn clean package
+mvn dependency:copy-dependencies -DincludeScope=runtime -DoutputDirectory=target/libs
+java --module-path target/libs:target/ottercv-<version>.jar \
+  --add-modules javafx.controls,javafx.graphics \
+  -m svkreml.certificateViewer/svkreml.certificateViewer.gui.APP \
+  [path/to/certificate-or-crl]
+```
+
+### Internet Access Policy
+
+The application only contacts the network when it needs trust or revocation data:
+
+| Data | Source | When | Stored |
+|------|--------|------|--------|
+| Trusted Service List (TSL) | `https://e-trust.gosuslugi.ru/CA/DownloadTSL?schemaVersion=0` | First run, or when the local cache is older than 30 days | `~/.ottercv/tsl.bks` |
+| CRL | CRL distribution points embedded in the opened certificate (`http`, `https`, `ldap`) | During certificate revocation checking | Memory only, until the CRL's `nextUpdate` |
+| Issuer certificate | AIA `CA Issuers` URL embedded in the opened certificate (`http`, `https`, `ldap`) | When the issuer is missing from the TSL and local CA folder | Memory only |
+
+- Only the opened certificate's embedded URLs and the fixed TSL URL are used. The application does not crawl directories
+  or contact unrelated hosts.
+- HTTPS requests use the JVM's default TLS trust store. Certificate validation is not disabled, and no custom or pinned
+  trust store is used.
+- LDAP distribution points use plain `ldap://` as provided by the certificate; the application does not upgrade them to
+  LDAPS.
+- Certificates, CRLs, and other user files are never uploaded. No telemetry or analytics is sent.
+- If the network is unavailable, local viewing still works; trust and revocation checks may be reported as untrusted or
+  unverified.
+
+### Local Data and Temporary Files
+
+The application does not create a dedicated temporary directory. The only persistent runtime data is stored in
+`~/.ottercv`:
+
+```
+~/.ottercv/
+├── tsl.bks   # downloaded TSL cache; delete this file to force a refresh
+└── ca/       # optional local root/intermediate certificates (PEM or DER)
+```
+
+CRLs and issuer certificates fetched from the network are kept in memory only. Logs are written to standard output, not
+to a log file. The Java/AppImage runtime may use the operating system's temporary directory (for example `/tmp`) for its
+own internal files; those files are not application data and are managed by the OS.
+
+Build-time downloads are separate from runtime behavior: Maven fetches dependencies from Maven Central, and the
+`linux-appimage` profile downloads `appimagetool` from the AppImageKit GitHub releases.
+
 ## Running Tests
 
 ```bash
 mvn test
 ```
 
-52 tests covering chain building, validation, certificate parsing, and CRL verification.
+Tests covering chain building, validation, certificate and CRL parsing, CRL signature verification, and revocation checking.
 
 ## Architecture
 
@@ -41,6 +108,9 @@ certificateParser/
 ├── CertificateVerifier      # PKIX cert path builder (BouncyCastle)
 ├── CRLVerifier              # CRL download, caching, revocation checking
 ├── TrustChainBuilder        # Thin facade (legacy static API)
+├── InputLoader              # Certificate/CRL loading from PEM, DER, raw Base64
+├── CrlParser                # CRL → display model conversion
+├── CrlSignatureVerifier     # CRL issuer lookup and signature verification
 ├── KeyParser                # Certificate/key loading from bytes
 ├── ExtensionParser          # X.509 extension → display string conversion
 ├── CustomBCStyle            # X500Name style with Russian GOST OIDs
@@ -82,13 +152,33 @@ preferring self-signed certificates (shortest chain). A visited-set prevents inf
 | `untrusted/ROOT.cer` | Test root CA (GOST, not trusted)     |
 | `untrusted/CA.cer`   | Test intermediate CA                 |
 | `untrusted/USER.cer` | Test end-entity cert                 |
+| `crl/root.crl`       | Test root CRL (GOST)                 |
+| `crl/intermediate.crl` | Test intermediate CRL (GOST)       |
+| `crl/root_ca.pem`    | Test root CA                         |
+| `crl/intermediate_ca.pem` | Test intermediate CA            |
 
 ## Creating a Release
 
+The POM always contains the next development version (`X.Y.Z-SNAPSHOT`). Maven
+Release Plugin performs the release in two steps:
+
 ```bash
-git tag v1.1.2
-git push origin v1.1.2
+# Clean working tree and push access to origin are required.
+mvn release:prepare
+mvn release:perform
 ```
+
+`release:prepare`:
+
+- changes `X.Y.Z-SNAPSHOT` to `X.Y.Z`;
+- commits the release version;
+- creates and pushes the tag `vX.Y.Z`;
+- changes the version to `X.Y.(Z+1)-SNAPSHOT`;
+- commits the next development version.
+
+`release:perform` checks out the release tag and runs `clean verify`. Pushing the
+tag triggers `.github/workflows/appimage-release.yml`, which builds the AppImage
+and publishes it as a GitHub release.
 
 ## Output
 

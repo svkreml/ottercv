@@ -3,6 +3,7 @@ package svkreml.certificateViewer.gui.localization.ru;
 
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 import svkreml.certificateViewer.gui.api.model.CertificateStatus;
+import svkreml.certificateViewer.gui.api.model.CrlStatus;
 
 import java.time.Instant;
 import java.time.ZoneId;
@@ -20,14 +21,44 @@ public class Localization {
     public final String PROGRAM_TITLE = "Certificate";
     public final String TAB_GENERAL_TITLE = "General";
     public final String TAB_CHAIN_TITLE = "Chain";
+    public final String TAB_HELP_TITLE = "Справка";
+    public final String TAB_CRL_REVOKED_TITLE = "Отозванные сертификаты";
+    public final String TAB_CRL_LABEL_REVOKED = "Список отозванных сертификатов:";
+    public final String TAB_CRL_FILTER_BY_SERIAL = "Фильтр по номеру:";
+    public final String TAB_CRL_FILTER_SERIAL_PROMPT = "Введите номер сертификата";
+    public final String TAB_CRL_NO_REVOKED = "Нет отозванных сертификатов";
+    public final String TAB_CRL_NO_MATCHING_REVOKED = "Нет отозванных сертификатов с таким номером";
     public final String BUTTON_OK = "   OK   ";
+    public final String NOT_AVAILABLE = "—";
     public final String CERT_STATUS_TRUSTED = "Сертификат действителен";
     public final String CERT_STATUS_UNTRUSTED_ROOT = "Корневой сертификат данной цепочки не в списке доверенных";
     public final String CERT_STATUS_UNTRUSTED_CHAIN = "Корневой сертификат не в списке доверенных";
     public final String CERT_STATUS_BROKEN = "Подпись сертификата или сам сертификат невалиден";
     public final String CERT_STATUS_OVERDUE = "Срок действия сертификата истёк или не наступил";
     public final String CERT_STATUS_UNKNOWN = "Состояние сертификата не проверялось";
+    public final String CRL_STATUS_VALID = "CRL действителен";
+    public final String CRL_STATUS_EXPIRED = "Срок действия CRL истёк";
+    public final String CRL_STATUS_NOT_YET_VALID = "Срок действия CRL ещё не наступил";
+    public final String CRL_STATUS_SIGNATURE_INVALID = "Подпись CRL недействительна";
+    public final String CRL_STATUS_ISSUER_NOT_FOUND = "Сертификат издателя CRL не найден";
+    public final String CRL_STATUS_UNKNOWN = "Состояние CRL не проверялось";
+    public final String CRL_CHECKING_SIGNATURE = "Проверка подписи CRL...";
+    public final String CRL_SIGNATURE_VALID = "Подпись CRL действительна";
+    public final String CRL_SIGNATURE_INVALID = "Подпись CRL недействительна";
+    public final String CRL_SIGNATURE_ERROR = "Ошибка проверки подписи CRL: ";
+    public final String CRL_ISSUER_NOT_FOUND = "Сертификат издателя CRL не найден, подпись не проверена";
+    public final String CRL_ISSUER_CERTIFICATE = "Сертификат издателя CRL: ";
+    public final String CRL_EXPIRED = "Срок действия CRL истёк ";
+    public final String CRL_NOT_YET_VALID = "Срок действия CRL ещё не наступил ";
     public final String TAB_GENERAL_LABEL_CERTIFICATE_INFORMATION = "Сведения о сертификате:";
+    public final String TAB_GENERAL_LABEL_CRL_INFORMATION = "Сведения о CRL:";
+    public final String TAB_GENERAL_CRL_ISSUER = "Издатель:";
+    public final String TAB_GENERAL_CRL_VERSION = "Версия:";
+    public final String TAB_GENERAL_CRL_SIGNATURE_ALG = "Алгоритм подписи:";
+    public final String TAB_GENERAL_CRL_NUMBER = "Номер CRL:";
+    public final String TAB_GENERAL_CRL_REVOKED_COUNT = "Отозванных сертификатов:";
+    public final String TAB_GENERAL_CRL_THIS_UPDATE = "Обновлён:";
+    public final String TAB_GENERAL_CRL_NEXT_UPDATE = "Следующее обновление:";
     public final String TAB_GENERAL_VALID_FROM = "Действителен с ";
     public final String TAB_GENERAL_VALID_TO = " по ";
     public final String TAB_GENERAL_ISSUED_BY = "Субъект:";
@@ -47,6 +78,15 @@ public class Localization {
     public final String TAB_DETAIL_TABLE_KEY_PUBLIC_KEY_DETAILS = "Параметры ключа ЭП";
     public final String TAB_DETAIL_TABLE_KEY_THUMBPRINT_ALG = "Алгоритм отпечатка";
     public final String TAB_DETAIL_TABLE_KEY_THUMBPRINT_VALUE = "Отпечаток";
+    public final String TAB_DETAIL_TABLE_KEY_CRL_ISSUER = "Издатель CRL";
+    public final String TAB_DETAIL_TABLE_KEY_CRL_THIS_UPDATE = "Дата выпуска CRL";
+    public final String TAB_DETAIL_TABLE_KEY_CRL_NEXT_UPDATE = "Следующее обновление CRL";
+    public final String TAB_DETAIL_TABLE_KEY_CRL_NUMBER = "Номер CRL";
+    public final String TAB_DETAIL_TABLE_KEY_CRL_REVOKED_COUNT = "Количество отозванных сертификатов";
+    public final String TAB_DETAIL_TABLE_KEY_SIGNATURE_VALUE = "Значение подписи";
+    public final String TAB_DETAIL_TABLE_KEY_REVOCATION_DATE = "Дата отзыва";
+    public final String TAB_DETAIL_TABLE_KEY_REVOCATION_REASON = "Причина отзыва";
+    public final String TAB_DETAIL_TABLE_KEY_CERTIFICATE_ISSUER = "Издатель сертификата";
     public final String TAB_DETAIL_TABLE_KEY_PUBLIC_KEY_PARAMS = "Параметры:";
     public final String TAB_DETAIL_TABLE_KEY_PUBLIC_KEY_RSA_EXP = "Экспонента:";
     public final String TAB_DETAIL_TABLE_KEY_PUBLIC_KEY_LENGTH = "Длина ключа:";
@@ -254,6 +294,7 @@ public class Localization {
             localization.oidMap.put(new ASN1ObjectIdentifier("2.5.29.32"), "Certificate policies");
             localization.oidMap.put(new ASN1ObjectIdentifier("2.5.29.14"), "Subject key identifier");
             localization.oidMap.put(new ASN1ObjectIdentifier("2.5.29.21"), "Reason code");
+            localization.oidMap.put(new ASN1ObjectIdentifier("2.5.29.24"), "Invalidity date");
             localization.oidMap.put(new ASN1ObjectIdentifier("2.5.29.31"),
                     "Certificate Revocation List (CRL) distribution points");
             localization.oidMap.put(new ASN1ObjectIdentifier("2.5.29.37"), "Extended key usage");
@@ -537,6 +578,66 @@ public class Localization {
             case OVERDUE -> CERT_STATUS_OVERDUE;
             case UNKNOWN -> CERT_STATUS_UNKNOWN;
         };
+    }
+
+    public String nameCrlStatus(CrlStatus crlStatus) {
+        return switch (crlStatus) {
+            case VALID -> CRL_STATUS_VALID;
+            case EXPIRED -> CRL_STATUS_EXPIRED;
+            case NOT_YET_VALID -> CRL_STATUS_NOT_YET_VALID;
+            case SIGNATURE_INVALID -> CRL_STATUS_SIGNATURE_INVALID;
+            case ISSUER_NOT_FOUND -> CRL_STATUS_ISSUER_NOT_FOUND;
+            case UNKNOWN -> CRL_STATUS_UNKNOWN;
+        };
+    }
+
+    public String nameCrlReason(int reasonCode) {
+        return switch (reasonCode) {
+            case 0 -> "Не указана";
+            case 1 -> "Компрометация ключа";
+            case 2 -> "Компрометация CA";
+            case 3 -> "Изменение принадлежности";
+            case 4 -> "Заменён";
+            case 5 -> "Прекращение деятельности";
+            case 6 -> "Приостановлен";
+            case 8 -> "Исключён из CRL";
+            case 9 -> "Отозваны полномочия";
+            case 10 -> "Компрометация AA";
+            default -> "Код " + reasonCode;
+        };
+    }
+
+    public String helpText() {
+        return """
+                OtterCV — просмотр сертификатов X.509 и списков отзыва (CRL).
+
+                ИСПОЛЬЗОВАНИЕ
+                • Приложение открывает один сертификат или CRL, переданный при запуске.
+                • Поддерживаются файлы в PEM, DER или Base64. Используется первый аргумент.
+                • Без аргумента открывается встроенный certs/default.pem.
+                • Для сертификата доступны общие сведения, подробности и цепочка сертификатов.
+                • Для CRL доступны общие сведения, подробности и список отозванных сертификатов.
+                • В списке отозванных сертификатов можно фильтровать записи по номеру: регистр, пробелы, разделители и префикс 0x не учитываются.
+
+                ЗАГРУЗКА ИЗ ИНТЕРНЕТА
+                Приложение обращается в сеть только для проверки доверия и отзыва:
+                • TSL: %2$s — при первом запуске или если кэш старше 30 дней.
+                • CRL: адреса CRL Distribution Points из открытого сертификата (HTTP/HTTPS/LDAP) — при проверке отзыва.
+                • Сертификат издателя: AIA CA Issuers из открытого сертификата (HTTP/HTTPS/LDAP) — если издателя нет в TSL и локальной папке CA.
+                HTTPS использует стандартное доверенное хранилище JVM; проверка TLS не отключается. LDAP используется как указано в сертификате, без перехода на LDAPS. Открытые файлы не отправляются, телеметрии нет.
+                Без сети просмотр работает, но статус доверия или отзыва может быть неопределён.
+
+                ХРАНЕНИЕ ДАННЫХ И ВРЕМЕННЫЕ ФАЙЛЫ
+                • %1$s/tsl.bks — кэш TSL. Удалите файл, чтобы принудительно обновить его.
+                • %1$s/ca/ — необязательная папка с корневыми и промежуточными сертификатами (PEM/DER).
+                • CRL и сертификаты издателей хранятся только в памяти до nextUpdate.
+                • Собственного временного каталога нет. Логи выводятся в stdout. Java/AppImage могут использовать системный временный каталог (например, /tmp) для внутренних нужд.
+
+                СТАТУСЫ
+                • Зелёный — сертификат или CRL действителен.
+                • Красный — подпись неверна, сертификат отозван, истёк или корень недоверенный.
+                • Жёлтый или серый — статус не проверен или данных недостаточно.
+                """.formatted(DEFAULT_PATH, TSL_LOCATION);
     }
 
     public String formatDate(Date date) {

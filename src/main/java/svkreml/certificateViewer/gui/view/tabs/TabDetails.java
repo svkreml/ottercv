@@ -14,9 +14,16 @@ import svkreml.certificateViewer.gui.api.model.DetailType;
 import svkreml.certificateViewer.gui.localization.ru.Localization;
 import svkreml.certificateViewer.gui.view.utils.FxUtils;
 
+import java.util.List;
+
 public class TabDetails {
 
     public static Tab create(Localization localization, CertificateModel certificateModel) {
+        return create(localization, certificateModel.certificateDetails);
+    }
+
+    public static Tab create(Localization localization,
+                             List<CertificateModel.CertificateDetail> certificateDetails) {
         AnchorPane localRoot = new AnchorPane();
         Tab tab = new Tab(localization.TAB_DETAILS_TITLE, localRoot);
         tab.setClosable(false);
@@ -47,7 +54,7 @@ public class TabDetails {
             }
         });
 
-        tableView.getItems().addAll(certificateModel.certificateDetails);
+        tableView.getItems().addAll(certificateDetails);
 
         SplitPane splitPane = new SplitPane();
         splitPane.setOrientation(Orientation.VERTICAL);
