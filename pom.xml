@@ -4,7 +4,7 @@
 
     <groupId>svkreml.ottercv</groupId>
     <artifactId>ottercv</artifactId>
-    <version>1.1.8</version>
+    <version>1.1.9-SNAPSHOT</version>
     <packaging>jar</packaging>
     <name>Otter Certificate Viewer</name>
     <organization>
@@ -14,7 +14,7 @@
         <connection>scm:git:https://github.com/svkreml/ottercv.git</connection>
         <developerConnection>scm:git:https://github.com/svkreml/ottercv.git</developerConnection>
         <url>https://github.com/svkreml/ottercv</url>
-      <tag>v1.1.8</tag>
+      <tag>HEAD</tag>
   </scm>
 
     <properties>
